@@ -2,6 +2,7 @@ package minq
 
 import (
 	"bytes"
+	"fmt"
 )
 
 // Encode a QUIC packet.
@@ -70,6 +71,14 @@ type packetHeader struct {
 	ConnectionID ConnectionId
 	PacketNumber uint64 // Never more than 32 bits on the wire.
 	Version      VersionNumber
+}
+
+func (p *packetHeader) String() string {
+	ht := "SHORT"
+	if isLongHeader(p) {
+		ht = "LONG"
+	}
+	return fmt.Sprintf("%s PT=%x", ht, p.getHeaderType())
 }
 
 type packet struct {
@@ -204,15 +213,17 @@ func decodePacket(c ConnectionState, aead Aead, b []byte) (*Packet, error) {
 */
 
 func dumpPacket(payload []byte) string {
-	ret := "["
+	first := true
+	ret := fmt.Sprintf("%d=[", len(payload))
 
 	for len(payload) > 0 {
-		if len(ret) > 1 {
+		if !first {
 			ret += ", "
 		}
+		first = false
 		n, f, err := decodeFrame(payload)
 		if err != nil {
-			ret += "Couldn't decode remainder\n"
+			ret += fmt.Sprintf("Undecoded: [%x]", payload)
 			break
 		}
 		payload = payload[n:]

@@ -86,7 +86,7 @@ var ErrorDestroyConnection = fatalError("Terminate connection")
 var ErrorReceivedVersionNegotiation = fatalError("Received a version negotiation packet advertising a different version than ours")
 var ErrorConnIsClosed = fatalError("Connection is closed")
 var ErrorStreamIsClosed = fatalError("Stream is closed")
-var ErrorInvalidPacket = nonFatalError("Could not decode packet")
+var ErrorInvalidPacket = nonFatalError("Invalid packet")
 var ErrorConnectionTimedOut = fatalError("Connection timed out")
 var ErrorMissingValue = fatalError("Expected value is missing")
 var ErrorInvalidEncoding = fatalError("Invalid encoding")
@@ -94,9 +94,9 @@ var ErrorProtocolViolation = fatalError("Protocol violation")
 var ErrorFrameFormatError = fatalError("Frame format error")
 
 // Protocol errors
-type ErrorCode uint32
+type ErrorCode uint16
 
 const (
-	kQuicErrorNoError           = ErrorCode(0x80000000)
-	kQuicErrorProtocolViolation = ErrorCode(0x8000000A)
+	kQuicErrorNoError           = ErrorCode(0x0000)
+	kQuicErrorProtocolViolation = ErrorCode(0x000A)
 )
