@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/ekr/minq"
+	"github.com/boisjacques/minq"
 	"net"
 	"os"
 	"runtime/pprof"
@@ -115,10 +115,12 @@ func main() {
 		return
 	}
 
+	addressHelper := minq.NewAddressHelper()
+
 	utrans := minq.NewUdpTransport(usock, uaddr)
 
 	conn := minq.NewConnection(utrans, minq.RoleClient,
-		minq.NewTlsConfig(serverName), &connHandler{})
+		minq.NewTlsConfig(serverName), &connHandler{}, addressHelper)
 
 	fmt.Printf("Client conn id=%x\n", conn.ClientId())
 

@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/ekr/minq"
+	"github.com/boisjacques/minq"
 	"net"
 	"time"
 )

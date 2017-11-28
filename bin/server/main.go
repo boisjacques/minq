@@ -6,16 +6,16 @@ import (
 	"crypto/x509"
 	"flag"
 	"fmt"
+	"github.com/boisjacques/minq"
 	"github.com/cloudflare/cfssl/helpers"
-	"github.com/ekr/minq"
-	"io/ioutil"
 	"io"
+	"io/ioutil"
 	"net"
 	"os"
+	"runtime/pprof"
 	"strconv"
 	"strings"
 	"time"
-	"runtime/pprof"
 )
 
 var addr string
@@ -224,15 +224,15 @@ func main() {
 	var certChain []*x509.Certificate
 
 	if cpuProfile != "" {
-        f, err := os.Create(cpuProfile)
-        if err != nil {
-            fmt.Printf("Could not create CPU profile file %v err=%v\n", cpuProfile, err)
+		f, err := os.Create(cpuProfile)
+		if err != nil {
+			fmt.Printf("Could not create CPU profile file %v err=%v\n", cpuProfile, err)
 			return
-        }
-        pprof.StartCPUProfile(f)
+		}
+		pprof.StartCPUProfile(f)
 		fmt.Println("CPU profiler started")
-        defer pprof.StopCPUProfile()
-    }
+		defer pprof.StopCPUProfile()
+	}
 
 	config := minq.NewTlsConfig(serverName)
 	config.ForceHrr = statelessReset
@@ -282,12 +282,15 @@ func main() {
 		}
 		minq.SetLogOutput(logFunc)
 	}
+
+	// Get local IP Address for usock
 	uaddr, err := net.ResolveUDPAddr("udp", addr)
 	if err != nil {
 		fmt.Println("Invalid UDP addr: ", err)
 		return
 	}
 
+	// Create UDP socket
 	usock, err := net.ListenUDP("udp", uaddr)
 	if err != nil {
 		fmt.Println("Couldn't listen on UDP: ", err)
@@ -320,11 +323,10 @@ func main() {
 		}
 	}()
 
-
 	for {
 
 		select {
-		case _, open := <- stdin:
+		case _, open := <-stdin:
 			if open == false {
 				fmt.Println("Shutdown signal received from stdin. Goodnight.")
 				return

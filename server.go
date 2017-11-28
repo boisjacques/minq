@@ -15,11 +15,12 @@ type TransportFactory interface {
 // number of packets and will create Connections as needed, passing
 // each packet to the right connection.
 type Server struct {
-	handler      ServerHandler
-	transFactory TransportFactory
-	tls          TlsConfig
-	addrTable    map[string]*Connection
-	idTable      map[ConnectionId]*Connection
+	handler       ServerHandler
+	transFactory  TransportFactory
+	tls           TlsConfig
+	addrTable     map[string]*Connection
+	idTable       map[ConnectionId]*Connection
+	AddressHelper *AddressHelper
 }
 
 // Interface for the handler object which the Server will call
@@ -60,7 +61,7 @@ func (s *Server) Input(addr *net.UDPAddr, data []byte) (*Connection, error) {
 		if err != nil {
 			return nil, err
 		}
-		conn = NewConnection(trans, RoleServer, s.tls, nil)
+		conn = NewConnection(trans, RoleServer, s.tls, nil, s.AddressHelper)
 		conn.clientConnId = hdr.ConnectionID
 		newConn = true
 		s.idTable[conn.serverConnId] = conn
@@ -108,6 +109,7 @@ func NewServer(factory TransportFactory, tls TlsConfig, handler ServerHandler) *
 		tls,
 		make(map[string]*Connection),
 		make(map[ConnectionId]*Connection),
+		NewAddressHelper(),
 	}
 	s.tls.init()
 	return &s

@@ -2,6 +2,7 @@ package minq
 
 import (
 	"fmt"
+	"net"
 	"time"
 )
 
@@ -20,6 +21,8 @@ const (
 	kFrameTypeStreamBlocked   = frameType(0x9)
 	kFrameTypeStreamIdNeeded  = frameType(0xa)
 	kFrameTypeNewConnectionId = frameType(0xb)
+	kFrameTypeAdd             = frameType(0xc)
+	kFrameTypeMod             = frameType(0xd)
 	kFrameTypeAck             = frameType(0xa0)
 	kFrameTypeStream          = frameType(0xc0)
 )
@@ -104,10 +107,15 @@ func decodeFrame(data []byte) (uintptr, *frame, error) {
 		inner = &streamIdNeededFrame{}
 	case t == uint8(kFrameTypeNewConnectionId):
 		inner = &newConnectionIdFrame{}
+	case t == uint8(kFrameTypeAdd):
+		inner = &addrArrayFrame{}
+	case t == uint8(kFrameTypeMod):
+		inner = &addrModFrame{}
 	case t >= uint8(kFrameTypeAck) && t <= 0xbf:
 		inner = &ackFrame{}
 	case t >= uint8(kFrameTypeStream):
 		inner = &streamFrame{}
+
 	default:
 		logf(logTypeConnection, "Unknown frame type %v", t)
 		return 0, nil, fmt.Errorf("Received unknown frame type: %v", t)
@@ -273,6 +281,12 @@ type pingFrame struct {
 	Type frameType
 }
 
+func newPingFrame() frame {
+	return newFrame(0,
+		&pingFrame{
+			kFrameTypePing})
+}
+
 func (f pingFrame) String() string {
 	return "PING"
 }
@@ -334,6 +348,54 @@ func (f newConnectionIdFrame) String() string {
 
 func (f newConnectionIdFrame) getType() frameType {
 	return kFrameTypeNewConnectionId
+}
+
+// ADDR_ARRAY
+
+type addrArrayFrame struct {
+	Type      frameType
+	Addresses []net.UDPAddr
+}
+
+func newAddrArrayFrame(stream uint32, addresses []net.UDPAddr) frame {
+	return newFrame(stream,
+		&addrArrayFrame{
+			kFrameTypeAdd,
+			addresses,
+		})
+}
+
+func (f addrArrayFrame) String() string {
+	return "ADDR_ARRAY"
+}
+
+func (f addrArrayFrame) getType() frameType {
+	return kFrameTypeAdd
+}
+
+// ADDR_MOD
+
+type addrModFrame struct {
+	Type    frameType
+	delete  bool
+	address net.UDPAddr
+}
+
+func newAddrModFrame(stream uint32, delete bool, address net.UDPAddr) frame {
+	return newFrame(stream,
+		&addrModFrame{
+			kFrameTypeMod,
+			delete,
+			address,
+		})
+}
+
+func (f addrModFrame) String() string {
+	return "ADDR_MOD"
+}
+
+func (f addrModFrame) getType() frameType {
+	return kFrameTypeMod
 }
 
 // ACK

@@ -124,11 +124,14 @@ type Connection struct {
 	tpHandler        *transportParametersHandler
 	log              loggingFunction
 	retransmitTime   uint32
+	waitForPong      bool
+	scheduler        Scheduler
+	addressHelper    *AddressHelper
 }
 
 // Create a new QUIC connection. Should only be used with role=RoleClient,
 // though we use it with RoleServer internally.
-func NewConnection(trans Transport, role uint8, tls TlsConfig, handler ConnectionHandler) *Connection {
+func NewConnection(trans Transport, role uint8, tls TlsConfig, handler ConnectionHandler, helper *AddressHelper) *Connection {
 	c := Connection{
 		handler,
 		role,
@@ -152,13 +155,18 @@ func NewConnection(trans Transport, role uint8, tls TlsConfig, handler Connectio
 		nil,
 		make(map[uint64]ackRanges, 0),
 		time.Now(),
-		10, // Very short idle timeout.
+		100, // 100 seconds idle timeout
 		nil,
 		nil,
 		kDefaultInitialRtt,
+		false,
+		Scheduler{},
+		helper,
 	}
 
 	c.log = newConnectionLogger(&c)
+	c.scheduler = NewScheduler(c.transport, &c, c.addressHelper)
+	c.scheduler.ListenOnChannel()
 
 	// TODO(ekr@rtfm.com): This isn't generic, but rather tied to
 	// Mint.
@@ -190,6 +198,14 @@ func NewConnection(trans Transport, role uint8, tls TlsConfig, handler Connectio
 	if newframe {
 		s.setState(kStreamStateOpen)
 	}
+
+	go func() {
+		for {
+			c.addressHelper.GatherAddresses()
+			time.Sleep(1000 * time.Millisecond)
+		}
+	}()
+
 	return &c
 }
 
@@ -365,7 +381,7 @@ func (c *Connection) sendSpecialClearPacket(pt uint8, connId ConnectionId, pn ui
 		return err
 	}
 	packet = append(packet, payload...)
-	c.transport.Send(packet)
+	c.scheduler.Send(packet)
 	return nil
 }
 
@@ -432,7 +448,7 @@ func (c *Connection) sendPacketRaw(pt uint8, connId ConnectionId, pn uint64, ver
 	packet := append(hdr, protected...)
 
 	c.log(logTypeTrace, "Sending packet len=%d, len=%v", len(packet), hex.EncodeToString(packet))
-	c.transport.Send(packet)
+	c.scheduler.Send(packet)
 
 	return nil
 }
@@ -485,7 +501,7 @@ func (c *Connection) sendPacket(pt uint8, tosend []frame) error {
 	return c.sendPacketRaw(pt, connId, pn, c.version, payload)
 }
 
-func (c *Connection) sendFramesInPacket(pt uint8, tosend []frame) error {
+func (c *Connection) sendFramesInPacket(pt uint8, tosend []frame) (error, uint64) {
 	c.log(logTypeConnection, "%s: Sending packet of type %v. %v frames", c.label(), pt, len(tosend))
 	c.log(logTypeTrace, "Sending packet of type %v. %v frames", pt, len(tosend))
 	left := c.mtu
@@ -540,7 +556,7 @@ func (c *Connection) sendFramesInPacket(pt uint8, tosend []frame) error {
 	// TODO(ekr@rtfm.com): this is gross.
 	hdr, err := encode(&p.packetHeader)
 	if err != nil {
-		return err
+		return err, 0
 	}
 	left -= len(hdr)
 
@@ -549,7 +565,7 @@ func (c *Connection) sendFramesInPacket(pt uint8, tosend []frame) error {
 	for _, f := range tosend {
 		l, err := f.length()
 		if err != nil {
-			return err
+			return err, 0
 		}
 
 		assert(l <= left)
@@ -563,9 +579,9 @@ func (c *Connection) sendFramesInPacket(pt uint8, tosend []frame) error {
 	packet := append(hdr, protected...)
 
 	c.log(logTypeTrace, "Sending packet len=%d, len=%v", len(packet), hex.EncodeToString(packet))
-	c.transport.Send(packet)
+	c.scheduler.Send(packet)
 
-	return nil
+	return nil, p.PacketNumber
 }
 
 func (c *Connection) sendOnStream(streamId uint32, data []byte) error {
@@ -1356,6 +1372,23 @@ func (c *Connection) processUnprotected(hdr *packetHeader, packetNumber uint64, 
 				return err
 			}
 
+		case *pingFrame:
+			// TODO: Implement
+
+		case *addrArrayFrame:
+			c.log(logTypeMultipath, "Received address propagation on stream %v %x", inner.String(), inner.Addresses)
+			for _, remote := range inner.Addresses {
+				c.addressHelper.ipAddresses = append(c.addressHelper.ipAddresses, remote)
+				c.scheduler.addRemoteAddress(&remote)
+			}
+
+		case *addrModFrame:
+			c.log(logTypeMultipath, "Received address modification in stream %v %x", inner.String())
+			if inner.delete {
+				c.scheduler.removeAddress(&inner.address)
+			} else {
+				c.scheduler.addRemoteAddress(&inner.address)
+			}
 		default:
 			c.log(logTypeConnection, "Received unexpected frame type")
 		}

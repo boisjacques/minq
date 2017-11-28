@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"github.com/ekr/minq"
+	"github.com/boisjacques/minq"
 	"io/ioutil"
 	"strings"
 )
