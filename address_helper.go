@@ -1,7 +1,7 @@
 package minq
 
 import (
-	"fmt"
+	"log"
 	"net"
 	"strings"
 )
@@ -51,10 +51,12 @@ func (a *AddressHelper) GatherAddresses() {
 
 					}
 					arr := strings.Split(addr.String(), "/")
+					if strings.Contains(arr[0], ":") {
+						arr[0] = "[" + arr[0] + "]"
+					}
 					udpAddr, err := net.ResolveUDPAddr("udp", arr[0]+":4433")
 					if err != nil {
-						fmt.Println("Error parsing IP address: ", addr)
-						fmt.Println(err)
+						log.Println(err)
 					} else {
 						_, containsAddr := a.ipAddressPtr[udpAddr]
 						if containsAddr {
