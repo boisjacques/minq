@@ -4,12 +4,14 @@ import (
 	"log"
 	"net"
 	"strings"
+	"sync"
 )
 
 type AddressHelper struct {
 	ipAddressPtr map[*net.UDPAddr]bool
 	ipAddresses  []net.UDPAddr
 	listeners    []chan *net.UDPAddr
+	lock         sync.RWMutex
 }
 
 func NewAddressHelper() *AddressHelper {
@@ -17,6 +19,7 @@ func NewAddressHelper() *AddressHelper {
 		make(map[*net.UDPAddr]bool),
 		make([]net.UDPAddr, 0),
 		make([]chan *net.UDPAddr, 0),
+		sync.RWMutex{},
 	}
 	ah.GatherAddresses()
 	return &ah
@@ -35,9 +38,7 @@ func (a *AddressHelper) Publish(msg *net.UDPAddr) {
 }
 
 func (a *AddressHelper) GatherAddresses() {
-	for address := range a.ipAddressPtr {
-		a.ipAddressPtr[address] = false
-	}
+	a.falsifyAddresses()
 	interfaces, _ := net.Interfaces()
 	for _, iface := range interfaces {
 		flags := iface.Flags.String()
@@ -58,16 +59,15 @@ func (a *AddressHelper) GatherAddresses() {
 					if err != nil {
 						log.Println(err)
 					} else {
-						_, containsAddr := a.ipAddressPtr[udpAddr]
-						if containsAddr {
-							a.ipAddressPtr[udpAddr] = true
+						if a.containsBlocking(udpAddr) {
+							a.write(udpAddr, true)
 						}
-						if !containsAddr {
+						if !a.containsBlocking(udpAddr) {
 							if (udpAddr.IP.To4 != nil) || (ipv6 == false && udpAddr.IP.To4() == nil) {
 								if udpAddr.IP.To4() == nil {
 									ipv6 = true
 								}
-								a.ipAddressPtr[udpAddr] = true
+								a.write(udpAddr, true)
 								a.Publish(udpAddr)
 							}
 						}
@@ -80,6 +80,8 @@ func (a *AddressHelper) GatherAddresses() {
 }
 
 func (a *AddressHelper) cleanUp() {
+	a.lock.Lock()
+	defer a.lock.Unlock()
 	for address, value := range a.ipAddressPtr {
 		if value == false {
 			delete(a.ipAddressPtr, address)
@@ -89,5 +91,28 @@ func (a *AddressHelper) cleanUp() {
 }
 
 func (a *AddressHelper) GetAddresses() *map[*net.UDPAddr]bool {
+	a.lock.RLock()
+	defer a.lock.RUnlock()
 	return &a.ipAddressPtr
+}
+
+func (a *AddressHelper) write(addr *net.UDPAddr, bool bool) {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+	a.ipAddressPtr[addr] = bool
+}
+
+func (a *AddressHelper) containsBlocking(addr *net.UDPAddr) bool {
+	a.lock.RLock()
+	defer a.lock.RUnlock()
+	_, contains := a.ipAddressPtr[addr]
+	return contains
+}
+
+func (a *AddressHelper) falsifyAddresses() {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+	for address := range a.ipAddressPtr {
+		a.ipAddressPtr[address] = false
+	}
 }

@@ -1,6 +1,6 @@
 QED - QUIC with enhanced distribution
 =====================================
-QED is a experimental multipath extension for the QUIC protocol. It is based on minq[https://www.github.com/ekr/minq] and comes with all its features and flaws.
+QED is a experimental multipath extension for the QUIC protocol. It is based on minq (https://www.github.com/ekr/minq) and comes with all its features and flaws.
 
 
 ## WARNING

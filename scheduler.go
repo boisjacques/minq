@@ -4,6 +4,14 @@ import (
 	"fmt"
 	"hash/adler32"
 	"net"
+	"sync"
+)
+
+type direcionAddr uint8
+
+const (
+	local  = direcionAddr(0)
+	remote = direcionAddr(1)
 )
 
 type Scheduler struct {
@@ -17,6 +25,9 @@ type Scheduler struct {
 	addrChan      chan *net.UDPAddr
 	localAddrs    map[*net.UDPAddr]bool
 	remoteAddrs   map[*net.UDPAddr]struct{}
+	lockRemote    sync.RWMutex
+	lockLocal     sync.RWMutex
+	lockPaths     sync.RWMutex
 }
 
 func NewScheduler(initTrans Transport, connection *Connection, ah *AddressHelper) Scheduler {
@@ -46,6 +57,9 @@ func NewScheduler(initTrans Transport, connection *Connection, ah *AddressHelper
 		make(chan *net.UDPAddr),
 		ah.ipAddressPtr,
 		make(map[*net.UDPAddr]struct{}),
+		sync.RWMutex{},
+		sync.RWMutex{},
+		sync.RWMutex{},
 	}
 }
 
@@ -88,6 +102,8 @@ func (s *Scheduler) addLocalAddress(local net.UDPAddr) {
 func (s *Scheduler) addRemoteAddress(remote *net.UDPAddr) {
 	s.connection.log(logTypeMultipath, "Adding remote address %v", remote)
 	s.remoteAddrs[remote] = struct{}{}
+	s.lockLocal.RLock()
+	defer s.lockLocal.RUnlock()
 	for local := range s.localAddrs {
 		if isSameVersion(local, remote) {
 			s.newPath(local, remote)
@@ -96,14 +112,12 @@ func (s *Scheduler) addRemoteAddress(remote *net.UDPAddr) {
 }
 
 func (s *Scheduler) removeAddress(address *net.UDPAddr) {
-	_, exists := s.remoteAddrs[address]
-	if exists {
-		delete(s.remoteAddrs, address)
+	if s.containsBlocking(address, remote) {
+		s.delete(address, remote)
 		s.connection.log(logTypeMultipath, "Deleted remote address %v", address)
 	}
-	_, exists = s.localAddrs[address]
-	if exists {
-		delete(s.localAddrs, address)
+	if s.containsBlocking(address, local) {
+		s.delete(address, local)
 		s.connection.log(logTypeMultipath, "Deleted local address %v", address)
 	}
 	for k, v := range s.paths {
@@ -114,6 +128,10 @@ func (s *Scheduler) removeAddress(address *net.UDPAddr) {
 }
 
 func (s *Scheduler) initializePaths() {
+	s.lockLocal.RLock()
+	s.lockRemote.RLock()
+	defer s.lockLocal.RUnlock()
+	defer s.lockRemote.RUnlock()
 	for local := range s.localAddrs {
 		for remote := range s.remoteAddrs {
 			if isSameVersion(local, remote) {
@@ -135,13 +153,12 @@ func (s *Scheduler) ListenOnChannel() {
 	go func() {
 		for {
 			addr := <-s.addrChan
-			_, contains := s.localAddrs[addr]
-			if !contains {
+			if !s.containsBlocking(addr, local) {
 				// false has no meaning at this point
 				// bool maps equivalent to sets in golang
-				s.localAddrs[addr] = false
+				s.write(addr)
 			} else {
-				delete(s.localAddrs, addr)
+				s.delete(addr, local)
 			}
 		}
 	}()
@@ -149,6 +166,8 @@ func (s *Scheduler) ListenOnChannel() {
 
 func (s *Scheduler) assebleAddrArrayFrame() frame {
 	arr := make([]net.UDPAddr, 0)
+	s.lockLocal.RLock()
+	defer s.lockLocal.RUnlock()
 	for k, _ := range s.localAddrs {
 		arr = append(arr, *k)
 	}
@@ -181,4 +200,43 @@ func isSameVersion(local, remote *net.UDPAddr) bool {
 		return true
 	}
 	return false
+}
+
+func (s *Scheduler) containsBlocking(addr *net.UDPAddr, direcion direcionAddr) bool {
+	var contains bool
+	if direcion == local {
+		s.lockLocal.RLock()
+		defer s.lockLocal.RUnlock()
+		_, contains = s.localAddrs[addr]
+	} else if direcion == remote {
+		s.lockRemote.Lock()
+		defer s.lockRemote.Unlock()
+		_, contains = s.remoteAddrs[addr]
+	}
+	return contains
+}
+
+func (s *Scheduler) delete(addr *net.UDPAddr, direction direcionAddr) {
+	if direction == local {
+		s.lockLocal.Lock()
+		defer s.lockLocal.Unlock()
+		delete(s.localAddrs, addr)
+	}
+	if direction == remote {
+		s.lockRemote.Lock()
+		defer s.lockRemote.Unlock()
+		delete(s.remoteAddrs, addr)
+	}
+}
+
+func (s *Scheduler) deletePath(pathId uint32) {
+	s.lockPaths.Lock()
+	defer s.lockPaths.Unlock()
+	delete(s.paths, pathId)
+}
+
+func (s *Scheduler) write(addr *net.UDPAddr) {
+	s.lockLocal.Lock()
+	defer s.lockLocal.Unlock()
+	s.localAddrs[addr] = false
 }
