@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"github.com/boisjacques/minq"
 	"github.com/cloudflare/cfssl/helpers"
-	"io"
+	//"io"
 	"io/ioutil"
 	"net"
 	"os"
@@ -283,15 +283,8 @@ func main() {
 		minq.SetLogOutput(logFunc)
 	}
 
-	// Get local IP Address for usock
-	uaddr, err := net.ResolveUDPAddr("udp", addr)
-	if err != nil {
-		fmt.Println("Invalid UDP addr: ", err)
-		return
-	}
-
 	// Create UDP socket
-	usock, err := net.ListenUDP("udp", uaddr)
+	usock, err := net.ListenUDP("udp", nil)
 	if err != nil {
 		fmt.Println("Couldn't listen on UDP: ", err)
 		return
@@ -306,22 +299,25 @@ func main() {
 	server := minq.NewServer(minq.NewUdpTransportFactory(usock), config, handler)
 
 	stdin := make(chan []byte)
-	go func() {
-		for {
-			b := make([]byte, 1024)
-			n, err := os.Stdin.Read(b)
-			if err == io.EOF {
-				fmt.Println("EOF received")
-				close(stdin)
-				return
-			} else if err != nil {
-				fmt.Println("Error reading from stdin")
-				return
+	// Stdin causes debugging problems in golang
+	/*
+		go func() {
+			for {
+				b := make([]byte, 1024)
+				n, err := os.Stdin.Read(b)
+				if err == io.EOF {
+					fmt.Println("EOF received")
+					close(stdin)
+					return
+				} else if err != nil {
+					fmt.Println("Error reading from stdin")
+					return
+				}
+				b = b[:n]
+				stdin <- b
 			}
-			b = b[:n]
-			stdin <- b
-		}
-	}()
+		}()
+	*/
 
 	for {
 

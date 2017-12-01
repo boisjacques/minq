@@ -37,6 +37,13 @@ const (
 	maxAckGap = 255
 )
 
+type operation bool
+
+const (
+	kAddAddress    = operation(false)
+	kDeleteAddress = operation(true)
+)
+
 type innerFrame interface {
 	getType() frameType
 	String() string
@@ -377,11 +384,11 @@ func (f addrArrayFrame) getType() frameType {
 
 type addrModFrame struct {
 	Type    frameType
-	delete  bool
+	delete  operation
 	address net.UDPAddr
 }
 
-func newAddrModFrame(stream uint32, delete bool, address net.UDPAddr) frame {
+func newAddrModFrame(stream uint32, delete operation, address net.UDPAddr) frame {
 	return newFrame(stream,
 		&addrModFrame{
 			kFrameTypeMod,

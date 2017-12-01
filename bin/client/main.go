@@ -149,6 +149,15 @@ func main() {
 
 	fmt.Println("Connection established")
 
+	go func() {
+		for {
+			if conn.GetState() == minq.StateEstablished {
+				addressHelper.GatherAddresses()
+				time.Sleep(1000 * time.Millisecond)
+			}
+		}
+	}()
+
 	// Make all the streams we need
 	streams := make([]*minq.Stream, httpCount)
 	for i := 0; i < httpCount; i++ {

@@ -66,6 +66,8 @@ func (s *Server) Input(addr *net.UDPAddr, data []byte) (*Connection, error) {
 		newConn = true
 		s.idTable[conn.serverConnId] = conn
 		s.addrTable[addr.String()] = conn
+
+		// conn.sendFramesInPacket(packetType1RTTProtectedPhase1, conn.scheduler.assebleAddrArrayFrame())
 	}
 
 	err = conn.Input(data)

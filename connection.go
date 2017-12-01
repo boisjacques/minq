@@ -126,7 +126,7 @@ type Connection struct {
 	retransmitTime   uint32
 	waitForPong      bool
 	scheduler        Scheduler
-	addressHelper    *AddressHelper
+	AddressHelper    *AddressHelper
 }
 
 // Create a new QUIC connection. Should only be used with role=RoleClient,
@@ -165,7 +165,8 @@ func NewConnection(trans Transport, role uint8, tls TlsConfig, handler Connectio
 	}
 
 	c.log = newConnectionLogger(&c)
-	c.scheduler = NewScheduler(c.transport, &c, c.addressHelper)
+	c.scheduler = NewScheduler(c.transport, &c, c.AddressHelper)
+	c.scheduler.initializePaths()
 	c.scheduler.ListenOnChannel()
 
 	// TODO(ekr@rtfm.com): This isn't generic, but rather tied to
@@ -199,13 +200,7 @@ func NewConnection(trans Transport, role uint8, tls TlsConfig, handler Connectio
 		s.setState(kStreamStateOpen)
 	}
 
-	go func() {
-		for {
-			c.addressHelper.GatherAddresses()
-			time.Sleep(1000 * time.Millisecond)
-		}
-	}()
-
+	c.log(logTypeMultipath, "Connection created")
 	return &c
 }
 
@@ -1378,7 +1373,7 @@ func (c *Connection) processUnprotected(hdr *packetHeader, packetNumber uint64, 
 		case *addrArrayFrame:
 			c.log(logTypeMultipath, "Received address propagation on stream %v %x", inner.String(), inner.Addresses)
 			for _, remote := range inner.Addresses {
-				c.addressHelper.ipAddresses = append(c.addressHelper.ipAddresses, remote)
+				c.AddressHelper.ipAddresses = append(c.AddressHelper.ipAddresses, remote)
 				c.scheduler.addRemoteAddress(&remote)
 			}
 

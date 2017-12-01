@@ -75,7 +75,7 @@ func main() {
 	fmt.Printf("Remote addr=%v\n", addr)
 	utrans := minq.NewUdpTransport(usock, uaddr)
 
-	conn := minq.NewConnection(utrans, uint8(role), minq.TlsConfig{}, &connHandler{})
+	conn := minq.NewConnection(utrans, uint8(role), minq.TlsConfig{}, &connHandler{}, &minq.AddressHelper{})
 
 	// Start things off.
 	fmt.Println("Starting")
