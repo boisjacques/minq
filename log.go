@@ -27,6 +27,7 @@ const (
 	logTypeServer      = "server"
 	logTypeUdp         = "udp"
 	logTypeMultipath   = "mp"
+	logTypeMutex       = "mutex"
 	logTypeStream      = "stream"
 	logTypeFlowControl = "flow"
 	logTypePacket      = "packet" // Just send notes on which packets are sent and received
