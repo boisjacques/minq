@@ -1,11 +1,11 @@
 package minq
 
 import (
+	"github.com/boisjacques/golang-utils"
 	"log"
 	"net"
 	"strings"
 	"sync"
-	"util"
 )
 
 type AddressHelper struct {

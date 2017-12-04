@@ -2,10 +2,10 @@ package minq
 
 import (
 	"fmt"
+	"github.com/boisjacques/golang-utils"
 	"hash/adler32"
 	"net"
 	"sync"
-	"util"
 )
 
 type direcionAddr uint8
