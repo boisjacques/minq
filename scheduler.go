@@ -162,10 +162,6 @@ func (s *Scheduler) ListenOnChannel() {
 	s.addressHelper.Subscribe(s.addrChan)
 	s.connection.log(logTypeMultipath, "Subscribes to Address Helper")
 	go func() {
-<<<<<<< HEAD
-=======
-		index := 0
->>>>>>> master
 		oldTime := time.Now().Second()
 		for {
 			if s.connection.state == StateEstablished {
@@ -178,11 +174,8 @@ func (s *Scheduler) ListenOnChannel() {
 					s.connection.sendFramesInPacket(packetType1RTTProtectedPhase1, s.assembleAddrModFrame(kDeleteAddress, *addr))
 				}
 			} else {
-<<<<<<< HEAD
 				if time.Now().Second()-oldTime == 10 {
-=======
-				if time.Now().Second()-oldTime == 2 {
->>>>>>> master
+
 					s.connection.log(logTypeMultipath, "Waiting for connection establishment", util.Tracer())
 					oldTime = time.Now().Second()
 				}
