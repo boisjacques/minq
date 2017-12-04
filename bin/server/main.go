@@ -8,16 +8,15 @@ import (
 	"fmt"
 	"github.com/boisjacques/minq"
 	"github.com/cloudflare/cfssl/helpers"
-	//"io"
+	"io"
 	"io/ioutil"
+	"log"
 	"net"
 	"os"
 	"runtime/pprof"
 	"strconv"
 	"strings"
 	"time"
-	"runtime/pprof"
-	"log"
 )
 
 var addr string
@@ -59,7 +58,7 @@ func (h *feedthroughServerHandler) NewConnection(c *minq.Connection) {
 }
 
 type feedthroughConnHandler struct {
-	echo bool
+	echo      bool
 	bytesRead int
 }
 
@@ -235,15 +234,15 @@ func main() {
 	var certChain []*x509.Certificate
 
 	if cpuProfile != "" {
-        f, err := os.Create(cpuProfile)
-        if err != nil {
-            log.Printf("Could not create CPU profile file %v err=%v\n", cpuProfile, err)
+		f, err := os.Create(cpuProfile)
+		if err != nil {
+			log.Printf("Could not create CPU profile file %v err=%v\n", cpuProfile, err)
 			return
-        }
-        pprof.StartCPUProfile(f)
+		}
+		pprof.StartCPUProfile(f)
 		log.Println("CPU profiler started")
-        defer pprof.StopCPUProfile()
-    }
+		defer pprof.StopCPUProfile()
+	}
 
 	config := minq.NewTlsConfig(serverName)
 	config.ForceHrr = statelessReset
@@ -294,8 +293,14 @@ func main() {
 		minq.SetLogOutput(logFunc)
 	}
 
+	uaddr, err := net.ResolveUDPAddr("udp", ":4433")
+	if err != nil {
+		log.Println("Invalid UDP addr: ", err)
+		return
+	}
+
 	// Create UDP socket
-	usock, err := net.ListenUDP("udp", nil)
+	usock, err := net.ListenUDP("udp", uaddr)
 	if err != nil {
 		log.Println("Couldn't listen on UDP: ", err)
 		return
@@ -310,25 +315,23 @@ func main() {
 	server := minq.NewServer(minq.NewUdpTransportFactory(usock), config, handler)
 
 	stdin := make(chan []byte)
-	// Stdin causes debugging problems in golang
-	/*
-		go func() {
-			for {
-				b := make([]byte, 1024)
-				n, err := os.Stdin.Read(b)
-				if err == io.EOF {
-					fmt.Println("EOF received")
-					close(stdin)
-					return
-				} else if err != nil {
-					fmt.Println("Error reading from stdin")
-					return
-				}
-				b = b[:n]
-				stdin <- b
+
+	go func() {
+		for {
+			b := make([]byte, 1024)
+			n, err := os.Stdin.Read(b)
+			if err == io.EOF {
+				fmt.Println("EOF received")
+				close(stdin)
+				return
+			} else if err != nil {
+				fmt.Println("Error reading from stdin")
+				return
 			}
-		}()
-	*/
+			b = b[:n]
+			stdin <- b
+		}
+	}()
 
 	for {
 

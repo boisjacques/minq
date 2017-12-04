@@ -5,6 +5,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"util"
 )
 
 type AddressHelper struct {
@@ -81,7 +82,9 @@ func (a *AddressHelper) GatherAddresses() {
 
 func (a *AddressHelper) cleanUp() {
 	a.lock.Lock()
+	log.Println("locked: ", util.Tracer())
 	defer a.lock.Unlock()
+	defer log.Println("unlocked: ", util.Tracer())
 	for address, value := range a.ipAddressPtr {
 		if value == false {
 			delete(a.ipAddressPtr, address)
@@ -92,26 +95,34 @@ func (a *AddressHelper) cleanUp() {
 
 func (a *AddressHelper) GetAddresses() *map[*net.UDPAddr]bool {
 	a.lock.RLock()
+	log.Println("locked: ", util.Tracer())
 	defer a.lock.RUnlock()
+	defer log.Println("unlocked: ", util.Tracer())
 	return &a.ipAddressPtr
 }
 
 func (a *AddressHelper) write(addr *net.UDPAddr, bool bool) {
 	a.lock.Lock()
+	log.Println("locked: ", util.Tracer())
 	defer a.lock.Unlock()
+	defer log.Println("unlocked: ", util.Tracer())
 	a.ipAddressPtr[addr] = bool
 }
 
 func (a *AddressHelper) containsBlocking(addr *net.UDPAddr) bool {
 	a.lock.RLock()
+	log.Println("locked: ", util.Tracer())
 	defer a.lock.RUnlock()
+	defer log.Println("unlocked: ", util.Tracer())
 	_, contains := a.ipAddressPtr[addr]
 	return contains
 }
 
 func (a *AddressHelper) falsifyAddresses() {
 	a.lock.Lock()
+	log.Println("locked: ", util.Tracer())
 	defer a.lock.Unlock()
+	defer log.Println("unlocked: ", util.Tracer())
 	for address := range a.ipAddressPtr {
 		a.ipAddressPtr[address] = false
 	}
