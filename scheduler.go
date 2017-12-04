@@ -6,6 +6,7 @@ import (
 	"hash/adler32"
 	"net"
 	"sync"
+	"time"
 )
 
 type direcionAddr uint8
@@ -162,6 +163,7 @@ func (s *Scheduler) ListenOnChannel() {
 	s.connection.log(logTypeMultipath, "Subscribes to Address Helper")
 	go func() {
 		index := 0
+		oldTime := time.Now().Second()
 		for {
 			if s.connection.state == StateEstablished {
 				addr := <-s.addrChan
@@ -173,8 +175,9 @@ func (s *Scheduler) ListenOnChannel() {
 					s.connection.sendFramesInPacket(packetType1RTTProtectedPhase1, s.assembleAddrModFrame(kDeleteAddress, *addr))
 				}
 			} else {
-				if index%100000 == 0 {
+				if time.Now().Second()-oldTime == 2 {
 					s.connection.log(logTypeMultipath, "Waiting for connection establishment", util.Tracer())
+					oldTime = time.Now().Second()
 				}
 			}
 			index++
