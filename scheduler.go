@@ -160,7 +160,7 @@ func (s *Scheduler) removePath(pathId uint32) {
 
 func (s *Scheduler) ListenOnChannel() {
 	s.addressHelper.Subscribe(s.addrChan)
-	s.connection.log(logTypeMultipath, "Subscribes to Address Helper")
+	s.connection.log(logTypeMultipath, "Subscribed to Address Helper")
 	go func() {
 		oldTime := time.Now().Second()
 		for {

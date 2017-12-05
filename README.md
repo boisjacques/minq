@@ -26,7 +26,7 @@ in ```MINQ_LOG=connection go test```. Valid values are:
     	logTypeTrace      = "trace"
     	logTypeServer     = "server"
     	logTypeUdp        = "udp"
-      logTypeMultipath  = "mp"
+    	logTypeMultipath  = "mp"
     )
 
 Multiple log levels can be separated by commas.

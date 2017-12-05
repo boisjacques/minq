@@ -218,8 +218,8 @@ func logFunc(format string, args ...interface{}) {
 }
 
 func main() {
-	flag.StringVar(&addr, "addr", "localhost:4433", "[host:port]")
-	flag.StringVar(&serverName, "server-name", "localhost", "[SNI]")
+	flag.StringVar(&addr, "addr", "", "[host:port]")
+	flag.StringVar(&serverName, "server-name", "", "[SNI]")
 	flag.StringVar(&keyFile, "key", "", "Key file")
 	flag.StringVar(&certFile, "cert", "", "Cert file")
 	flag.StringVar(&logFile, "log", "", "Log file")
@@ -241,6 +241,19 @@ func main() {
 		pprof.StartCPUProfile(f)
 		log.Println("CPU profiler started")
 		defer pprof.StopCPUProfile()
+	}
+
+	if addr == "" {
+		log.Println("Invalid server address. Usage: -addr=[host:port]")
+		return
+	}
+	if serverName == "" {
+		host, _, err := net.SplitHostPort(addr)
+		if err != nil {
+			log.Println("Couldn't split host/port", err)
+			return
+		}
+		serverName = host
 	}
 
 	config := minq.NewTlsConfig(serverName)
