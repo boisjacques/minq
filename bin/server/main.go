@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"github.com/boisjacques/minq"
 	"github.com/cloudflare/cfssl/helpers"
-	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -225,7 +224,7 @@ func main() {
 	flag.StringVar(&certFile, "cert", "", "Cert file")
 	flag.StringVar(&logFile, "log", "", "Log file")
 	flag.BoolVar(&doHttp, "http", false, "Do HTTP/0.9")
-	flag.BoolVar(&echo, "echo", false, "Run as an echo server")
+	flag.BoolVar(&echo, "echo", true, "Run as an echo server")
 	flag.BoolVar(&statelessReset, "stateless-reset", false, "Do stateless reset")
 	flag.StringVar(&cpuProfile, "cpuprofile", "", "write cpu profile to file")
 	flag.Parse()
@@ -316,22 +315,24 @@ func main() {
 
 	stdin := make(chan []byte)
 
-	go func() {
-		for {
-			b := make([]byte, 1024)
-			n, err := os.Stdin.Read(b)
-			if err == io.EOF {
-				fmt.Println("EOF received")
-				close(stdin)
-				return
-			} else if err != nil {
-				fmt.Println("Error reading from stdin")
-				return
+	/*
+		go func() {
+			for {
+				b := make([]byte, 1024)
+				n, err := os.Stdin.Read(b)
+				if err == io.EOF {
+					fmt.Println("EOF received")
+					close(stdin)
+					return
+				} else if err != nil {
+					fmt.Println("Error reading from stdin")
+					return
+				}
+				b = b[:n]
+				stdin <- b
 			}
-			b = b[:n]
-			stdin <- b
-		}
-	}()
+		}()
+	*/
 
 	for {
 

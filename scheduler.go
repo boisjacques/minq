@@ -141,7 +141,7 @@ func (s *Scheduler) initializePaths() {
 	s.connection.log(logTypeMutex, "locked: ", util.Tracer())
 	defer s.addressHelper.lock.RUnlock()
 	defer s.lockRemote.RUnlock()
-	defer s.connection.log(logTypeMutex, "unlocked: ")
+	defer s.connection.log(logTypeMutex, "unlocked: ", util.Tracer())
 	for local := range s.localAddrs {
 		for remote := range s.remoteAddrs {
 			if isSameVersion(local, remote) {
