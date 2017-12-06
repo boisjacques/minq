@@ -222,7 +222,7 @@ func main() {
 	flag.StringVar(&serverName, "server-name", "", "[SNI]")
 	flag.StringVar(&keyFile, "key", "", "Key file")
 	flag.StringVar(&certFile, "cert", "", "Cert file")
-	flag.StringVar(&logFile, "log", "", "Log file")
+	flag.StringVar(&logFile, "log", "serverlog", "Log file")
 	flag.BoolVar(&doHttp, "http", false, "Do HTTP/0.9")
 	flag.BoolVar(&echo, "echo", true, "Run as an echo server")
 	flag.BoolVar(&statelessReset, "stateless-reset", false, "Do stateless reset")
@@ -303,7 +303,9 @@ func main() {
 			return
 		}
 		minq.SetLogOutput(logFunc)
+		log.SetOutput(logOut)
 	}
+	defer logOut.Close()
 
 	uaddr, err := net.ResolveUDPAddr("udp", ":4433")
 	if err != nil {

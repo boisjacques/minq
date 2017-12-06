@@ -4,10 +4,10 @@ import (
 	"flag"
 	"fmt"
 	"github.com/boisjacques/minq"
+	"log"
 	"net"
 	"os"
 	"runtime/pprof"
-	"log"
 	"time"
 )
 
@@ -25,7 +25,6 @@ type connHandler struct {
 func (h *connHandler) StateChanged(s minq.State) {
 	log.Println("State changed to ", minq.StateName(s))
 }
-
 
 func (h *connHandler) NewStream(s *minq.Stream) {
 }
@@ -86,6 +85,13 @@ func main() {
 	flag.StringVar(&cpuProfile, "cpuprofile", "", "write cpu profile to file")
 	flag.Parse()
 
+	logFile, err := os.OpenFile("clientLog", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+	if err != nil {
+		panic(err)
+	}
+	defer logFile.Close()
+	log.SetOutput(logFile)
+
 	if cpuProfile != "" {
 		f, err := os.Create(cpuProfile)
 		if err != nil {
@@ -95,7 +101,7 @@ func main() {
 		pprof.StartCPUProfile(f)
 		log.Println("CPU profiler started")
 		defer pprof.StopCPUProfile()
-    }
+	}
 
 	// Default to the host component of addr.
 	if serverName == "" {
@@ -229,7 +235,7 @@ func main() {
 			}
 		case i := <-stdin:
 			if i == nil {
-			// TODO(piet@devae.re) close the apropriate stream(s)
+				// TODO(piet@devae.re) close the apropriate stream(s)
 			}
 			streams[0].Write(i)
 			if err != nil {
