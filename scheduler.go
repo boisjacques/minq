@@ -17,19 +17,20 @@ const (
 )
 
 type Scheduler struct {
-	paths         map[uint32]Path
-	connection    *Connection
-	referenceRTT  uint16
-	pathZero      *Path
-	pathIds       []uint32
-	lastPath      uint32
-	addressHelper *AddressHelper
-	addrChan      chan *net.UDPAddr
-	localAddrs    map[*net.UDPAddr]bool
-	remoteAddrs   map[*net.UDPAddr]struct{}
-	lockRemote    sync.RWMutex
-	lockPaths     sync.RWMutex
-	isInitialized bool
+	paths          map[uint32]Path
+	connection     *Connection
+	referenceRTT   uint16
+	pathZero       *Path
+	pathIds        []uint32
+	lastPath       uint32
+	addressHelper  *AddressHelper
+	addrChan       chan *net.UDPAddr
+	localAddrs     map[string]*net.UDPAddr
+	localAddrsBool map[string]bool
+	remoteAddrs    map[string]*net.UDPAddr
+	lockRemote     sync.RWMutex
+	lockPaths      sync.RWMutex
+	isInitialized  bool
 }
 
 func NewScheduler(initTrans Transport, connection *Connection, ah *AddressHelper) Scheduler {
@@ -57,8 +58,9 @@ func NewScheduler(initTrans Transport, connection *Connection, ah *AddressHelper
 		0,
 		ah,
 		make(chan *net.UDPAddr),
-		ah.ipAddressPtr,
-		make(map[*net.UDPAddr]struct{}),
+		ah.ipAddresses,
+		ah.ipAddressesBool,
+		make(map[string]*net.UDPAddr),
 		sync.RWMutex{},
 		sync.RWMutex{},
 		false,
@@ -98,7 +100,7 @@ func (s *Scheduler) newPath(local, remote *net.UDPAddr) {
 
 func (s *Scheduler) addLocalAddress(local net.UDPAddr) {
 	s.connection.log(logTypeMultipath, "Adding local address %v", local)
-	for remote := range s.remoteAddrs {
+	for _, remote := range s.remoteAddrs {
 		if isSameVersion(&local, remote) {
 			s.newPath(&local, remote)
 		}
@@ -107,12 +109,12 @@ func (s *Scheduler) addLocalAddress(local net.UDPAddr) {
 
 func (s *Scheduler) addRemoteAddress(remote *net.UDPAddr) {
 	s.connection.log(logTypeMultipath, "Adding remote address %v", *remote)
-	s.remoteAddrs[remote] = struct{}{}
-	s.addressHelper.lock.RLock()
+	s.remoteAddrs[remote.String()] = remote
+	s.addressHelper.lockAddresses.RLock()
 	s.connection.log(logTypeMutex, "locked: ", util.Tracer())
-	defer s.addressHelper.lock.RUnlock()
+	defer s.addressHelper.lockAddresses.RUnlock()
 	defer s.connection.log(logTypeMutex, "unlocked: ", util.Tracer())
-	for local := range s.localAddrs {
+	for _, local := range s.localAddrs {
 		if isSameVersion(local, remote) {
 			s.newPath(local, remote)
 		}
@@ -136,14 +138,14 @@ func (s *Scheduler) removeAddress(address *net.UDPAddr) {
 }
 
 func (s *Scheduler) initializePaths() {
-	s.addressHelper.lock.RLock()
+	s.addressHelper.lockAddresses.RLock()
 	s.lockRemote.RLock()
 	s.connection.log(logTypeMutex, "locked: ", util.Tracer())
-	defer s.addressHelper.lock.RUnlock()
+	defer s.addressHelper.lockAddresses.RUnlock()
 	defer s.lockRemote.RUnlock()
 	defer s.connection.log(logTypeMutex, "unlocked: ", util.Tracer())
-	for local := range s.localAddrs {
-		for remote := range s.remoteAddrs {
+	for _, local := range s.localAddrs {
+		for _, remote := range s.remoteAddrs {
 			if isSameVersion(local, remote) {
 				s.newPath(local, remote)
 			}
@@ -186,12 +188,12 @@ func (s *Scheduler) ListenOnChannel() {
 
 func (s *Scheduler) assebleAddrArrayFrame() []frame {
 	arr := make([]net.UDPAddr, 0)
-	s.addressHelper.lock.RLock()
+	s.addressHelper.lockAddresses.RLock()
 	s.connection.log(logTypeMutex, "locked: ", util.Tracer())
-	defer s.addressHelper.lock.RUnlock()
+	defer s.addressHelper.lockAddresses.RUnlock()
 	defer s.connection.log(logTypeMutex, "unlocked: ", util.Tracer())
-	for k, _ := range s.localAddrs {
-		arr = append(arr, *k)
+	for _, v := range s.localAddrs {
+		arr = append(arr, *v)
 	}
 	frames := make([]frame, 0)
 	frame := newAddrArrayFrame(0, arr)
@@ -231,35 +233,35 @@ func isSameVersion(local, remote *net.UDPAddr) bool {
 func (s *Scheduler) containsBlocking(addr *net.UDPAddr, direcion direcionAddr) bool {
 	var contains bool
 	if direcion == local {
-		s.addressHelper.lock.RLock()
+		s.addressHelper.lockAddresses.RLock()
 		s.connection.log(logTypeMutex, "locked: ", util.Tracer())
-		defer s.addressHelper.lock.RUnlock()
+		defer s.addressHelper.lockAddresses.RUnlock()
 		defer s.connection.log(logTypeMutex, "unlocked: ", util.Tracer())
-		_, contains = s.localAddrs[addr]
+		_, contains = s.localAddrs[addr.String()]
 	} else if direcion == remote {
 		s.lockRemote.Lock()
 		s.connection.log(logTypeMutex, "locked: ", util.Tracer())
 		defer s.lockRemote.Unlock()
 		defer s.connection.log(logTypeMutex, "unlocked: ", util.Tracer())
-		_, contains = s.remoteAddrs[addr]
+		_, contains = s.remoteAddrs[addr.String()]
 	}
 	return contains
 }
 
 func (s *Scheduler) delete(addr *net.UDPAddr, direction direcionAddr) {
 	if direction == local {
-		s.addressHelper.lock.Lock()
+		s.addressHelper.lockAddresses.Lock()
 		s.connection.log(logTypeMutex, "locked: ", util.Tracer())
-		defer s.addressHelper.lock.Unlock()
+		defer s.addressHelper.lockAddresses.Unlock()
 		defer s.connection.log(logTypeMutex, "unlocked: ", util.Tracer())
-		delete(s.localAddrs, addr)
+		delete(s.localAddrs, addr.String())
 	}
 	if direction == remote {
 		s.lockRemote.Lock()
 		s.connection.log(logTypeMutex, "locked: ", util.Tracer())
 		defer s.lockRemote.Unlock()
 		defer s.connection.log(logTypeMutex, "unlocked: ", util.Tracer())
-		delete(s.remoteAddrs, addr)
+		delete(s.remoteAddrs, addr.String())
 	}
 }
 
@@ -272,9 +274,9 @@ func (s *Scheduler) deletePath(pathId uint32) {
 }
 
 func (s *Scheduler) write(addr *net.UDPAddr) {
-	s.addressHelper.lock.Lock()
+	s.addressHelper.lockAddresses.Lock()
 	s.connection.log(logTypeMutex, "locked: ", util.Tracer())
-	defer s.addressHelper.lock.Unlock()
+	defer s.addressHelper.lockAddresses.Unlock()
 	defer s.connection.log(logTypeMutex, "unlocked: ", util.Tracer())
-	s.localAddrs[addr] = false
+	s.localAddrsBool[addr.String()] = false
 }

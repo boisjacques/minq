@@ -125,8 +125,8 @@ type Connection struct {
 	log                loggingFunction
 	retransmitTime     uint32
 	lastSendQueuedTime time.Time
-	scheduler        Scheduler
-	AddressHelper    *AddressHelper
+	scheduler          Scheduler
+	AddressHelper      *AddressHelper
 }
 
 // Create a new QUIC connection. Should only be used with role=RoleClient,
@@ -1391,7 +1391,6 @@ func (c *Connection) processUnprotected(hdr *packetHeader, packetNumber uint64, 
 		case *addrArrayFrame:
 			c.log(logTypeMultipath, "Received address propagation on stream %v %x", inner.String(), inner.Addresses)
 			for _, remote := range inner.Addresses {
-				c.AddressHelper.ipAddresses = append(c.AddressHelper.ipAddresses, remote)
 				c.scheduler.addRemoteAddress(&remote)
 			}
 

@@ -9,17 +9,19 @@ import (
 )
 
 type AddressHelper struct {
-	ipAddressPtr map[*net.UDPAddr]bool
-	ipAddresses  []net.UDPAddr
-	listeners    []chan *net.UDPAddr
-	lock         sync.RWMutex
+	ipAddresses       map[string]*net.UDPAddr
+	ipAddressesBool   map[string]bool
+	listeners         []chan *net.UDPAddr
+	lockAddresses     sync.RWMutex
+	lockAddressesBool sync.RWMutex
 }
 
 func NewAddressHelper() *AddressHelper {
 	ah := AddressHelper{
-		make(map[*net.UDPAddr]bool),
-		make([]net.UDPAddr, 0),
+		make(map[string]*net.UDPAddr),
+		make(map[string]bool),
 		make([]chan *net.UDPAddr, 0),
+		sync.RWMutex{},
 		sync.RWMutex{},
 	}
 	ah.GatherAddresses()
@@ -81,49 +83,56 @@ func (a *AddressHelper) GatherAddresses() {
 }
 
 func (a *AddressHelper) cleanUp() {
-	a.lock.Lock()
+	a.lockAddresses.Lock()
+	a.lockAddressesBool.Lock()
 	log.Println("locked: ", util.Tracer())
-	defer a.lock.Unlock()
+	defer a.lockAddresses.Unlock()
+	defer a.lockAddressesBool.Unlock()
 	defer log.Println("unlocked: ", util.Tracer())
-	for address, value := range a.ipAddressPtr {
+	for key, value := range a.ipAddressesBool {
 		if value == false {
-			delete(a.ipAddressPtr, address)
-			a.Publish(address)
+			delete(a.ipAddresses, key)
+			a.Publish(a.ipAddresses[key])
 		}
 	}
 }
 
-func (a *AddressHelper) GetAddresses() *map[*net.UDPAddr]bool {
-	a.lock.RLock()
+func (a *AddressHelper) GetAddresses() *map[string]*net.UDPAddr {
+	a.lockAddresses.RLock()
 	log.Println("locked: ", util.Tracer())
-	defer a.lock.RUnlock()
+	defer a.lockAddresses.RUnlock()
 	defer log.Println("unlocked: ", util.Tracer())
-	return &a.ipAddressPtr
+	return &a.ipAddresses
 }
 
 func (a *AddressHelper) write(addr *net.UDPAddr, bool bool) {
-	a.lock.Lock()
+	a.lockAddresses.Lock()
+	a.lockAddressesBool.Lock()
 	log.Println("locked: ", util.Tracer())
-	defer a.lock.Unlock()
+	defer a.lockAddressesBool.Unlock()
+	defer a.lockAddresses.Unlock()
 	defer log.Println("unlocked: ", util.Tracer())
-	a.ipAddressPtr[addr] = bool
+	a.ipAddresses[addr.String()] = addr
+	a.ipAddressesBool[addr.String()] = bool
 }
 
 func (a *AddressHelper) containsBlocking(addr *net.UDPAddr) bool {
-	a.lock.RLock()
+	a.lockAddresses.RLock()
 	log.Println("locked: ", util.Tracer())
-	defer a.lock.RUnlock()
+	defer a.lockAddresses.RUnlock()
 	defer log.Println("unlocked: ", util.Tracer())
-	_, contains := a.ipAddressPtr[addr]
+	_, contains := a.ipAddresses[addr.String()]
 	return contains
 }
 
 func (a *AddressHelper) falsifyAddresses() {
-	a.lock.Lock()
+	a.lockAddresses.Lock()
+	a.lockAddressesBool.Lock()
 	log.Println("locked: ", util.Tracer())
-	defer a.lock.Unlock()
+	defer a.lockAddresses.Unlock()
+	defer a.lockAddressesBool.Unlock()
 	defer log.Println("unlocked: ", util.Tracer())
-	for address := range a.ipAddressPtr {
-		a.ipAddressPtr[address] = false
+	for address := range a.ipAddresses {
+		a.ipAddressesBool[address] = false
 	}
 }
