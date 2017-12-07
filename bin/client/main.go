@@ -17,6 +17,7 @@ var doHttp string
 var httpCount int
 var heartbeat int
 var cpuProfile string
+var logToFile bool
 
 type connHandler struct {
 	bytesRead int
@@ -83,14 +84,17 @@ func main() {
 	flag.IntVar(&httpCount, "httpCount", 1, "Number of parallel HTTP requests to start")
 	flag.IntVar(&heartbeat, "heartbeat", 0, "heartbeat frequency [ms]")
 	flag.StringVar(&cpuProfile, "cpuprofile", "", "write cpu profile to file")
+	flag.BoolVar(&logToFile, "log-to-file", true, "Log to file")
 	flag.Parse()
 
-	logFile, err := os.OpenFile("clientLog", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
-	if err != nil {
-		panic(err)
+	if logToFile {
+		logFile, err := os.OpenFile("clientLog", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+		if err != nil {
+			panic(err)
+		}
+		defer logFile.Close()
+		log.SetOutput(logFile)
 	}
-	defer logFile.Close()
-	log.SetOutput(logFile)
 
 	if cpuProfile != "" {
 		f, err := os.Create(cpuProfile)

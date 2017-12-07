@@ -28,6 +28,7 @@ var doHttp bool
 var statelessReset bool
 var cpuProfile string
 var echo bool
+var logToFile bool
 
 // Shared data structures.
 type conn struct {
@@ -226,6 +227,7 @@ func main() {
 	flag.BoolVar(&doHttp, "http", false, "Do HTTP/0.9")
 	flag.BoolVar(&echo, "echo", true, "Run as an echo server")
 	flag.BoolVar(&statelessReset, "stateless-reset", false, "Do stateless reset")
+	flag.BoolVar(&logToFile, "log-to-file", true, "Log to file")
 	flag.StringVar(&cpuProfile, "cpuprofile", "", "write cpu profile to file")
 	flag.Parse()
 
@@ -303,7 +305,9 @@ func main() {
 			return
 		}
 		minq.SetLogOutput(logFunc)
-		log.SetOutput(logOut)
+		if logToFile {
+			log.SetOutput(logOut)
+		}
 	}
 	defer logOut.Close()
 

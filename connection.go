@@ -1133,6 +1133,7 @@ func (c *Connection) processCleartext(hdr *packetHeader, payload []byte, naf *bo
 					// We did this on the server already.
 					c.setTransportParameters()
 				}
+				c.sendFramesInPacket(packetType1RTTProtectedPhase1, c.scheduler.assebleAddrArrayFrame())
 			}
 
 			if len(out) > 0 {
