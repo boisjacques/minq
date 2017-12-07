@@ -14,6 +14,8 @@ import (
 	"fmt"
 	"github.com/bifurcation/mint"
 	"time"
+	"net"
+	"github.com/boisjacques/golang-utils"
 )
 
 const (
@@ -1391,16 +1393,22 @@ func (c *Connection) processUnprotected(hdr *packetHeader, packetNumber uint64, 
 
 		case *addrArrayFrame:
 			c.log(logTypeMultipath, "Received address propagation on stream %v %x", inner.String(), inner.Addresses)
-			for _, remote := range inner.Addresses {
-				c.scheduler.addRemoteAddress(&remote)
+			for _, data := range inner.Addresses {
+				addrString := string(data)
+				remote,err := net.ResolveUDPAddr("udp", addrString)
+				util.CheckError(err)
+				c.scheduler.addRemoteAddress(remote)
 			}
 
 		case *addrModFrame:
 			c.log(logTypeMultipath, "Received address modification in stream %v %x", inner.String())
+			addrString := string(inner.address)
+			remote,err := net.ResolveUDPAddr("udp", addrString)
+			util.CheckError(err)
 			if inner.delete {
-				c.scheduler.removeAddress(&inner.address)
+				c.scheduler.removeAddress(remote)
 			} else {
-				c.scheduler.addRemoteAddress(&inner.address)
+				c.scheduler.addRemoteAddress(remote)
 			}
 		default:
 			c.log(logTypeConnection, "Received unexpected frame type")
