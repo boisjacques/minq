@@ -69,7 +69,7 @@ func NewScheduler(initTrans Transport, connection *Connection, ah *AddressHelper
 
 // TODO: Implement proper scheduling, simple round robin right now
 func (s *Scheduler) Send(p []byte) error {
-	s.lastPath = s.lastPath + 1%uint32(len(s.pathIds))
+	s.lastPath = (s.lastPath + 1) % uint32(len(s.pathIds))
 	err := s.paths[s.pathIds[s.lastPath]].transport.Send(p)
 	if err != nil {
 		fmt.Println(err)
