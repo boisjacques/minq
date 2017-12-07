@@ -1398,12 +1398,14 @@ func (c *Connection) processUnprotected(hdr *packetHeader, packetNumber uint64, 
 			addrString := string(inner.Addresses)
 			data := strings.Split(addrString, "#")
 			for _, date := range data {
-				remote, err := net.ResolveUDPAddr("udp", date)
-				if err != nil {
-					log.Println(err)
-					log.Println(util.Tracer())
+				if date != "" {
+					remote, err := net.ResolveUDPAddr("udp", date)
+					if err != nil {
+						log.Println(err)
+						log.Println(util.Tracer())
+					}
+					c.scheduler.addRemoteAddress(remote)
 				}
-				c.scheduler.addRemoteAddress(remote)
 			}
 
 		case *addrModFrame:
