@@ -13,9 +13,11 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/bifurcation/mint"
-	"time"
-	"net"
 	"github.com/boisjacques/golang-utils"
+	"log"
+	"net"
+	"strings"
+	"time"
 )
 
 const (
@@ -1393,18 +1395,25 @@ func (c *Connection) processUnprotected(hdr *packetHeader, packetNumber uint64, 
 
 		case *addrArrayFrame:
 			c.log(logTypeMultipath, "Received address propagation on stream %v %x", inner.String(), inner.Addresses)
-			for _, data := range inner.Addresses {
-				addrString := string(data)
-				remote,err := net.ResolveUDPAddr("udp", addrString)
-				util.CheckError(err)
+			addrString := string(inner.Addresses)
+			data := strings.Split(addrString, "#")
+			for _, date := range data {
+				remote, err := net.ResolveUDPAddr("udp", date)
+				if err != nil {
+					log.Println(err)
+					log.Println(util.Tracer())
+				}
 				c.scheduler.addRemoteAddress(remote)
 			}
 
 		case *addrModFrame:
 			c.log(logTypeMultipath, "Received address modification in stream %v %x", inner.String())
 			addrString := string(inner.address)
-			remote,err := net.ResolveUDPAddr("udp", addrString)
-			util.CheckError(err)
+			remote, err := net.ResolveUDPAddr("udp", addrString)
+			if err != nil {
+				log.Println(err)
+				log.Println(util.Tracer())
+			}
 			if inner.delete {
 				c.scheduler.removeAddress(remote)
 			} else {

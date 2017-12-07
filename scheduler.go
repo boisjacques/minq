@@ -213,7 +213,10 @@ func (s *Scheduler) assembleAddrModFrame(delete operation, addr net.UDPAddr) []f
 func xor(local, remote []byte) []byte {
 	rval := make([]byte, 0)
 	for i := 0; i < len(local); i++ {
-		rval[i] = local[i] ^ remote[i]
+		rval = append(rval, local[i])
+	}
+	for i := 0; i < len(remote); i++ {
+		rval = append(rval, remote[i])
 	}
 
 	return rval
