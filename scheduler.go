@@ -88,6 +88,7 @@ func (s *Scheduler) newPath(local, remote *net.UDPAddr) {
 	usock, err := net.ListenUDP("udp", local)
 	if err != nil {
 		s.connection.log(logTypeMultipath, "Error while creating path local IP: %x remote IP %v", *local, *remote)
+		return
 	}
 	transport := NewUdpTransport(usock, remote)
 	checksum := adler32.Checksum(xor([]byte(local.String()), []byte(remote.String())))
