@@ -84,10 +84,12 @@ func (s *Scheduler) Send(p []byte) error {
 }
 
 // TODO: Consider using CRC32 instead of adler32
+// TODO: Implement proper source address handling
 func (s *Scheduler) newPath(local, remote *net.UDPAddr) {
-	usock, err := net.ListenUDP("udp", local)
+	usock, err := s.addressHelper.openSocket(local)
 	if err != nil {
 		s.connection.log(logTypeMultipath, "Error while creating path local IP: %x remote IP %v", *local, *remote)
+		s.connection.log(logTypeMultipath, "Following error occurred", err)
 		return
 	}
 	transport := NewUdpTransport(usock, remote)

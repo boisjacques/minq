@@ -11,16 +11,20 @@ import (
 type AddressHelper struct {
 	ipAddresses       map[string]*net.UDPAddr
 	ipAddressesBool   map[string]bool
+	sockets           map[string]*net.UDPConn
 	listeners         []chan *net.UDPAddr
 	lockAddresses     sync.RWMutex
 	lockAddressesBool sync.RWMutex
+	lockSockets       sync.RWMutex
 }
 
 func NewAddressHelper() *AddressHelper {
 	ah := AddressHelper{
 		make(map[string]*net.UDPAddr),
 		make(map[string]bool),
+		make(map[string]*net.UDPConn),
 		make([]chan *net.UDPAddr, 0),
+		sync.RWMutex{},
 		sync.RWMutex{},
 		sync.RWMutex{},
 	}
@@ -62,10 +66,10 @@ func (a *AddressHelper) GatherAddresses() {
 					if err != nil {
 						log.Println(err)
 					} else {
-						if a.containsBlocking(udpAddr) {
+						if a.containsAddress(udpAddr) {
 							a.write(udpAddr, true)
 						}
-						if !a.containsBlocking(udpAddr) {
+						if !a.containsAddress(udpAddr) {
 							if (udpAddr.IP.To4 != nil) || (ipv6 == false && udpAddr.IP.To4() == nil) {
 								if udpAddr.IP.To4() == nil {
 									ipv6 = true
@@ -80,6 +84,20 @@ func (a *AddressHelper) GatherAddresses() {
 		}
 	}
 	a.cleanUp()
+}
+
+func (a *AddressHelper) openSocket(local *net.UDPAddr) (*net.UDPConn, error) {
+	a.lockSockets.Lock()
+	log.Println("locked", util.Tracer())
+	defer a.lockSockets.Unlock()
+	defer log.Println("unlocked", util.Tracer())
+	var err error = nil
+	usock, contains := a.sockets[local.String()]
+	if !contains {
+		usock, err = net.ListenUDP("udp", local)
+		a.sockets[local.String()] = usock
+	}
+	return usock, err
 }
 
 func (a *AddressHelper) cleanUp() {
@@ -116,12 +134,21 @@ func (a *AddressHelper) write(addr *net.UDPAddr, bool bool) {
 	a.ipAddressesBool[addr.String()] = bool
 }
 
-func (a *AddressHelper) containsBlocking(addr *net.UDPAddr) bool {
+func (a *AddressHelper) containsAddress(addr *net.UDPAddr) bool {
 	a.lockAddresses.RLock()
 	log.Println("locked: ", util.Tracer())
 	defer a.lockAddresses.RUnlock()
 	defer log.Println("unlocked: ", util.Tracer())
 	_, contains := a.ipAddresses[addr.String()]
+	return contains
+}
+
+func (a *AddressHelper) containsSocket(addr *net.UDPAddr) bool {
+	a.lockSockets.RLock()
+	log.Println("locked: ", util.Tracer())
+	defer a.lockSockets.RUnlock()
+	defer log.Println("unlocked: ", util.Tracer())
+	_, contains := a.sockets[addr.String()]
 	return contains
 }
 
