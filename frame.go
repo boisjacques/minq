@@ -399,12 +399,12 @@ type addrModFrame struct {
 	address []byte
 }
 
-func newAddrModFrame(stream uint32, delete operation, address net.UDPAddr) frame {
+func newAddrModFrame(stream uint32, delete operation, address string) frame {
 	return newFrame(stream,
 		&addrModFrame{
 			kFrameTypeMod,
 			delete,
-			[]byte(address.String()),
+			[]byte(address),
 		})
 }
 

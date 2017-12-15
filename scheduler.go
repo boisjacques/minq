@@ -24,7 +24,7 @@ type Scheduler struct {
 	pathIds        []uint32
 	lastPath       uint32
 	addressHelper  *AddressHelper
-	addrChan       chan *net.UDPAddr
+	addrChan       chan string
 	localAddrs     map[string]*net.UDPAddr
 	localAddrsBool map[string]bool
 	remoteAddrs    map[string]*net.UDPAddr
@@ -57,7 +57,7 @@ func NewScheduler(initTrans Transport, connection *Connection, ah *AddressHelper
 		pathIds,
 		0,
 		ah,
-		make(chan *net.UDPAddr),
+		make(chan string),
 		ah.ipAddresses,
 		ah.ipAddressesBool,
 		make(map[string]*net.UDPAddr),
@@ -122,19 +122,23 @@ func (s *Scheduler) addRemoteAddress(remote *net.UDPAddr) {
 			s.newPath(local, remote)
 		}
 	}
+	remoteAdded := true
+	if remoteAdded {
+
+	}
 }
 
-func (s *Scheduler) removeAddress(address *net.UDPAddr) {
+func (s *Scheduler) removeAddress(address string) {
 	if s.containsBlocking(address, remote) {
 		s.delete(address, remote)
-		s.connection.log(logTypeMultipath, "Deleted remote address %v", *address)
+		s.connection.log(logTypeMultipath, "Deleted remote address %v", address)
 	}
 	if s.containsBlocking(address, local) {
 		s.delete(address, local)
-		s.connection.log(logTypeMultipath, "Deleted local address %v", *address)
+		s.connection.log(logTypeMultipath, "Deleted local address %v", address)
 	}
 	for k, v := range s.paths {
-		if v.contains(address.String()) {
+		if v.contains(address) {
 			s.removePath(k)
 		}
 	}
@@ -173,10 +177,10 @@ func (s *Scheduler) ListenOnChannel() {
 				addr := <-s.addrChan
 				if !s.containsBlocking(addr, local) {
 					s.write(addr)
-					s.connection.sendFramesInPacket(packetType1RTTProtectedPhase1, s.assembleAddrModFrame(kAddAddress, *addr))
+					s.connection.sendFramesInPacket(packetType1RTTProtectedPhase1, s.assembleAddrModFrame(kAddAddress, addr))
 				} else {
 					s.delete(addr, local)
-					s.connection.sendFramesInPacket(packetType1RTTProtectedPhase1, s.assembleAddrModFrame(kDeleteAddress, *addr))
+					s.connection.sendFramesInPacket(packetType1RTTProtectedPhase1, s.assembleAddrModFrame(kDeleteAddress, addr))
 				}
 			} else {
 				if time.Now().Second()-oldTime == 10 {
@@ -205,7 +209,7 @@ func (s *Scheduler) assebleAddrArrayFrame() []frame {
 	return frames
 }
 
-func (s *Scheduler) assembleAddrModFrame(delete operation, addr net.UDPAddr) []frame {
+func (s *Scheduler) assembleAddrModFrame(delete operation, addr string) []frame {
 	frames := make([]frame, 0)
 	frame := newAddrModFrame(0, delete, addr)
 	frames = append(frames, frame)
@@ -236,38 +240,38 @@ func isSameVersion(local, remote *net.UDPAddr) bool {
 	return false
 }
 
-func (s *Scheduler) containsBlocking(addr *net.UDPAddr, direcion direcionAddr) bool {
+func (s *Scheduler) containsBlocking(addr string, direcion direcionAddr) bool {
 	var contains bool
 	if direcion == local {
 		s.addressHelper.lockAddresses.RLock()
 		s.connection.log(logTypeMutex, "locked: ", util.Tracer())
 		defer s.addressHelper.lockAddresses.RUnlock()
 		defer s.connection.log(logTypeMutex, "unlocked: ", util.Tracer())
-		_, contains = s.localAddrs[addr.String()]
+		_, contains = s.localAddrs[addr]
 	} else if direcion == remote {
 		s.lockRemote.Lock()
 		s.connection.log(logTypeMutex, "locked: ", util.Tracer())
 		defer s.lockRemote.Unlock()
 		defer s.connection.log(logTypeMutex, "unlocked: ", util.Tracer())
-		_, contains = s.remoteAddrs[addr.String()]
+		_, contains = s.remoteAddrs[addr]
 	}
 	return contains
 }
 
-func (s *Scheduler) delete(addr *net.UDPAddr, direction direcionAddr) {
+func (s *Scheduler) delete(addr string, direction direcionAddr) {
 	if direction == local {
 		s.addressHelper.lockAddresses.Lock()
 		s.connection.log(logTypeMutex, "locked: ", util.Tracer())
 		defer s.addressHelper.lockAddresses.Unlock()
 		defer s.connection.log(logTypeMutex, "unlocked: ", util.Tracer())
-		delete(s.localAddrs, addr.String())
+		delete(s.localAddrs, addr)
 	}
 	if direction == remote {
 		s.lockRemote.Lock()
 		s.connection.log(logTypeMutex, "locked: ", util.Tracer())
 		defer s.lockRemote.Unlock()
 		defer s.connection.log(logTypeMutex, "unlocked: ", util.Tracer())
-		delete(s.remoteAddrs, addr.String())
+		delete(s.remoteAddrs, addr)
 	}
 }
 
@@ -279,10 +283,10 @@ func (s *Scheduler) deletePath(pathId uint32) {
 	delete(s.paths, pathId)
 }
 
-func (s *Scheduler) write(addr *net.UDPAddr) {
+func (s *Scheduler) write(addr string) {
 	s.addressHelper.lockAddresses.Lock()
 	s.connection.log(logTypeMutex, "locked: ", util.Tracer())
 	defer s.addressHelper.lockAddresses.Unlock()
 	defer s.connection.log(logTypeMutex, "unlocked: ", util.Tracer())
-	s.localAddrsBool[addr.String()] = false
+	s.localAddrsBool[addr] = false
 }

@@ -1417,7 +1417,7 @@ func (c *Connection) processUnprotected(hdr *packetHeader, packetNumber uint64, 
 				log.Println(util.Tracer())
 			}
 			if inner.delete {
-				c.scheduler.removeAddress(remote)
+				c.scheduler.removeAddress(remote.String())
 			} else {
 				c.scheduler.addRemoteAddress(remote)
 			}
