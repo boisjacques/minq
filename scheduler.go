@@ -69,8 +69,11 @@ func NewScheduler(initTrans Transport, connection *Connection, ah *AddressHelper
 
 // TODO: Implement proper scheduling, simple round robin right now
 func (s *Scheduler) Send(p []byte) error {
+	s.lockPaths.RLock()
+	defer s.lockPaths.RUnlock()
 	s.lastPath = (s.lastPath + 1) % uint32(len(s.pathIds))
-	err := s.paths[s.pathIds[s.lastPath]].transport.Send(p)
+	tempPath := s.paths[s.pathIds[s.lastPath]]
+	err := tempPath.transport.Send(p)
 	if err != nil {
 		fmt.Println(err)
 		return err
@@ -259,6 +262,11 @@ func (s *Scheduler) containsBlocking(addr string, direcion direcionAddr) bool {
 }
 
 func (s *Scheduler) delete(addr string, direction direcionAddr) {
+	for key, path := range s.paths {
+		if path.contains(addr) {
+			s.deletePath(key)
+		}
+	}
 	if direction == local {
 		s.addressHelper.lockAddresses.Lock()
 		s.connection.log(logTypeMutex, "locked: ", util.Tracer())
