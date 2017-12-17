@@ -31,6 +31,7 @@ const (
 	logTypeStream      = "stream"
 	logTypeFlowControl = "flow"
 	logTypePacket      = "packet" // Just send notes on which packets are sent and received
+	logTypeCongestion  = "congestion"
 )
 
 var (
