@@ -1,35 +1,43 @@
 package minq
 
 import (
+	"github.com/boisjacques/golang-utils"
 	"log"
 	"net"
 	"strings"
 	"sync"
+	"time"
 )
 
 type AddressHelper struct {
-	ipAddressPtr map[*net.UDPAddr]bool
-	ipAddresses  []net.UDPAddr
-	listeners    []chan *net.UDPAddr
-	lock         sync.RWMutex
+	ipAddresses       map[string]*net.UDPAddr
+	ipAddressesBool   map[string]bool
+	sockets           map[string]*net.UDPConn
+	listeners         []chan string
+	lockAddresses     sync.RWMutex
+	lockAddressesBool sync.RWMutex
+	lockSockets       sync.RWMutex
 }
 
 func NewAddressHelper() *AddressHelper {
 	ah := AddressHelper{
-		make(map[*net.UDPAddr]bool),
-		make([]net.UDPAddr, 0),
-		make([]chan *net.UDPAddr, 0),
+		make(map[string]*net.UDPAddr),
+		make(map[string]bool),
+		make(map[string]*net.UDPConn),
+		make([]chan string, 0),
+		sync.RWMutex{},
+		sync.RWMutex{},
 		sync.RWMutex{},
 	}
 	ah.GatherAddresses()
 	return &ah
 }
 
-func (a *AddressHelper) Subscribe(c chan *net.UDPAddr) {
+func (a *AddressHelper) Subscribe(c chan string) {
 	a.listeners = append(a.listeners, c)
 }
 
-func (a *AddressHelper) Publish(msg *net.UDPAddr) {
+func (a *AddressHelper) Publish(msg string) {
 	if len(a.listeners) > 0 {
 		for _, c := range a.listeners {
 			c <- msg
@@ -59,16 +67,16 @@ func (a *AddressHelper) GatherAddresses() {
 					if err != nil {
 						log.Println(err)
 					} else {
-						if a.containsBlocking(udpAddr) {
+						if a.containsAddress(udpAddr) {
 							a.write(udpAddr, true)
 						}
-						if !a.containsBlocking(udpAddr) {
+						if !a.containsAddress(udpAddr) {
 							if (udpAddr.IP.To4 != nil) || (ipv6 == false && udpAddr.IP.To4() == nil) {
 								if udpAddr.IP.To4() == nil {
 									ipv6 = true
 								}
 								a.write(udpAddr, true)
-								a.Publish(udpAddr)
+								a.Publish(udpAddr.String())
 							}
 						}
 					}
@@ -79,40 +87,82 @@ func (a *AddressHelper) GatherAddresses() {
 	a.cleanUp()
 }
 
+func (a *AddressHelper) openSocket(local *net.UDPAddr) (*net.UDPConn, error) {
+	a.lockSockets.Lock()
+	log.Println("locked", util.Tracer())
+	defer a.lockSockets.Unlock()
+	defer log.Println("unlocked", util.Tracer())
+	var err error = nil
+	usock, contains := a.sockets[local.String()]
+	if !contains {
+		usock, err = net.ListenUDP("udp", local)
+		a.sockets[local.String()] = usock
+	}
+	return usock, err
+}
+
 func (a *AddressHelper) cleanUp() {
-	a.lock.Lock()
-	defer a.lock.Unlock()
-	for address, value := range a.ipAddressPtr {
+	a.lockAddresses.Lock()
+	a.lockAddressesBool.Lock()
+	log.Println("locked: ", util.Tracer())
+	defer a.lockAddresses.Unlock()
+	defer a.lockAddressesBool.Unlock()
+	defer log.Println("unlocked: ", util.Tracer())
+	for key, value := range a.ipAddressesBool {
 		if value == false {
-			delete(a.ipAddressPtr, address)
-			a.Publish(address)
+			a.Publish(key)
+			time.Sleep(1000) //Wait 1 ms for handling in scheduler
+			delete(a.ipAddresses, key)
+			a.sockets[key].Close()
 		}
 	}
 }
 
-func (a *AddressHelper) GetAddresses() *map[*net.UDPAddr]bool {
-	a.lock.RLock()
-	defer a.lock.RUnlock()
-	return &a.ipAddressPtr
+func (a *AddressHelper) GetAddresses() *map[string]*net.UDPAddr {
+	a.lockAddresses.RLock()
+	log.Println("locked: ", util.Tracer())
+	defer a.lockAddresses.RUnlock()
+	defer log.Println("unlocked: ", util.Tracer())
+	return &a.ipAddresses
 }
 
 func (a *AddressHelper) write(addr *net.UDPAddr, bool bool) {
-	a.lock.Lock()
-	defer a.lock.Unlock()
-	a.ipAddressPtr[addr] = bool
+	a.lockAddresses.Lock()
+	a.lockAddressesBool.Lock()
+	log.Println("locked: ", util.Tracer())
+	defer a.lockAddressesBool.Unlock()
+	defer a.lockAddresses.Unlock()
+	defer log.Println("unlocked: ", util.Tracer())
+	a.ipAddresses[addr.String()] = addr
+	a.ipAddressesBool[addr.String()] = bool
 }
 
-func (a *AddressHelper) containsBlocking(addr *net.UDPAddr) bool {
-	a.lock.RLock()
-	defer a.lock.RUnlock()
-	_, contains := a.ipAddressPtr[addr]
+func (a *AddressHelper) containsAddress(addr *net.UDPAddr) bool {
+	a.lockAddresses.RLock()
+	log.Println("locked: ", util.Tracer())
+	defer a.lockAddresses.RUnlock()
+	defer log.Println("unlocked: ", util.Tracer())
+	_, contains := a.ipAddresses[addr.String()]
+	return contains
+}
+
+func (a *AddressHelper) containsSocket(addr *net.UDPAddr) bool {
+	a.lockSockets.RLock()
+	log.Println("locked: ", util.Tracer())
+	defer a.lockSockets.RUnlock()
+	defer log.Println("unlocked: ", util.Tracer())
+	_, contains := a.sockets[addr.String()]
 	return contains
 }
 
 func (a *AddressHelper) falsifyAddresses() {
-	a.lock.Lock()
-	defer a.lock.Unlock()
-	for address := range a.ipAddressPtr {
-		a.ipAddressPtr[address] = false
+	a.lockAddresses.Lock()
+	a.lockAddressesBool.Lock()
+	log.Println("locked: ", util.Tracer())
+	defer a.lockAddresses.Unlock()
+	defer a.lockAddressesBool.Unlock()
+	defer log.Println("unlocked: ", util.Tracer())
+	for address := range a.ipAddresses {
+		a.ipAddressesBool[address] = false
 	}
 }

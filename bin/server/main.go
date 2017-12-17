@@ -8,16 +8,14 @@ import (
 	"fmt"
 	"github.com/boisjacques/minq"
 	"github.com/cloudflare/cfssl/helpers"
-	//"io"
 	"io/ioutil"
+	"log"
 	"net"
 	"os"
 	"runtime/pprof"
 	"strconv"
 	"strings"
 	"time"
-	"runtime/pprof"
-	"log"
 )
 
 var addr string
@@ -30,6 +28,7 @@ var doHttp bool
 var statelessReset bool
 var cpuProfile string
 var echo bool
+var logToFile bool
 
 // Shared data structures.
 type conn struct {
@@ -59,7 +58,7 @@ func (h *feedthroughServerHandler) NewConnection(c *minq.Connection) {
 }
 
 type feedthroughConnHandler struct {
-	echo bool
+	echo      bool
 	bytesRead int
 }
 
@@ -220,14 +219,15 @@ func logFunc(format string, args ...interface{}) {
 }
 
 func main() {
-	flag.StringVar(&addr, "addr", "localhost:4433", "[host:port]")
-	flag.StringVar(&serverName, "server-name", "localhost", "[SNI]")
+	flag.StringVar(&addr, "addr", "", "[host:port]")
+	flag.StringVar(&serverName, "server-name", "", "[SNI]")
 	flag.StringVar(&keyFile, "key", "", "Key file")
 	flag.StringVar(&certFile, "cert", "", "Cert file")
-	flag.StringVar(&logFile, "log", "", "Log file")
+	flag.StringVar(&logFile, "log", "serverlog", "Log file")
 	flag.BoolVar(&doHttp, "http", false, "Do HTTP/0.9")
-	flag.BoolVar(&echo, "echo", false, "Run as an echo server")
+	flag.BoolVar(&echo, "echo", true, "Run as an echo server")
 	flag.BoolVar(&statelessReset, "stateless-reset", false, "Do stateless reset")
+	flag.BoolVar(&logToFile, "log-to-file", true, "Log to file")
 	flag.StringVar(&cpuProfile, "cpuprofile", "", "write cpu profile to file")
 	flag.Parse()
 
@@ -235,15 +235,28 @@ func main() {
 	var certChain []*x509.Certificate
 
 	if cpuProfile != "" {
-        f, err := os.Create(cpuProfile)
-        if err != nil {
-            log.Printf("Could not create CPU profile file %v err=%v\n", cpuProfile, err)
+		f, err := os.Create(cpuProfile)
+		if err != nil {
+			log.Printf("Could not create CPU profile file %v err=%v\n", cpuProfile, err)
 			return
-        }
-        pprof.StartCPUProfile(f)
+		}
+		pprof.StartCPUProfile(f)
 		log.Println("CPU profiler started")
-        defer pprof.StopCPUProfile()
-    }
+		defer pprof.StopCPUProfile()
+	}
+
+	if addr == "" {
+		log.Println("Invalid server address. Usage: -addr=[host:port]")
+		return
+	}
+	if serverName == "" {
+		host, _, err := net.SplitHostPort(addr)
+		if err != nil {
+			log.Println("Couldn't split host/port", err)
+			return
+		}
+		serverName = host
+	}
 
 	config := minq.NewTlsConfig(serverName)
 	config.ForceHrr = statelessReset
@@ -292,10 +305,20 @@ func main() {
 			return
 		}
 		minq.SetLogOutput(logFunc)
+		if logToFile {
+			log.SetOutput(logOut)
+		}
+	}
+	defer logOut.Close()
+
+	uaddr, err := net.ResolveUDPAddr("udp", ":4433")
+	if err != nil {
+		log.Println("Invalid UDP addr: ", err)
+		return
 	}
 
 	// Create UDP socket
-	usock, err := net.ListenUDP("udp", nil)
+	usock, err := net.ListenUDP("udp", uaddr)
 	if err != nil {
 		log.Println("Couldn't listen on UDP: ", err)
 		return
@@ -310,7 +333,7 @@ func main() {
 	server := minq.NewServer(minq.NewUdpTransportFactory(usock), config, handler)
 
 	stdin := make(chan []byte)
-	// Stdin causes debugging problems in golang
+
 	/*
 		go func() {
 			for {

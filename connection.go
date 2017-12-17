@@ -13,6 +13,10 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/bifurcation/mint"
+	"github.com/boisjacques/golang-utils"
+	"log"
+	"net"
+	"strings"
 	"time"
 )
 
@@ -125,8 +129,8 @@ type Connection struct {
 	log                loggingFunction
 	retransmitTime     uint32
 	lastSendQueuedTime time.Time
-	scheduler        Scheduler
-	AddressHelper    *AddressHelper
+	scheduler          Scheduler
+	AddressHelper      *AddressHelper
 }
 
 // Create a new QUIC connection. Should only be used with role=RoleClient,
@@ -1133,6 +1137,7 @@ func (c *Connection) processCleartext(hdr *packetHeader, payload []byte, naf *bo
 					// We did this on the server already.
 					c.setTransportParameters()
 				}
+				c.sendFramesInPacket(packetType1RTTProtectedPhase1, c.scheduler.assebleAddrArrayFrame())
 			}
 
 			if len(out) > 0 {
@@ -1390,17 +1395,31 @@ func (c *Connection) processUnprotected(hdr *packetHeader, packetNumber uint64, 
 
 		case *addrArrayFrame:
 			c.log(logTypeMultipath, "Received address propagation on stream %v %x", inner.String(), inner.Addresses)
-			for _, remote := range inner.Addresses {
-				c.AddressHelper.ipAddresses = append(c.AddressHelper.ipAddresses, remote)
-				c.scheduler.addRemoteAddress(&remote)
+			addrString := string(inner.Addresses)
+			data := strings.Split(addrString, "#")
+			for _, date := range data {
+				if date != "" {
+					remote, err := net.ResolveUDPAddr("udp", date)
+					if err != nil {
+						log.Println(err)
+						log.Println(util.Tracer())
+					}
+					c.scheduler.addRemoteAddress(remote)
+				}
 			}
 
 		case *addrModFrame:
 			c.log(logTypeMultipath, "Received address modification in stream %v %x", inner.String())
+			addrString := string(inner.address)
+			remote, err := net.ResolveUDPAddr("udp", addrString)
+			if err != nil {
+				log.Println(err)
+				log.Println(util.Tracer())
+			}
 			if inner.delete {
-				c.scheduler.removeAddress(&inner.address)
+				c.scheduler.removeAddress(remote.String())
 			} else {
-				c.scheduler.addRemoteAddress(&inner.address)
+				c.scheduler.addRemoteAddress(remote)
 			}
 		default:
 			c.log(logTypeConnection, "Received unexpected frame type")

@@ -361,14 +361,25 @@ func (f newConnectionIdFrame) getType() frameType {
 
 type addrArrayFrame struct {
 	Type      frameType
-	Addresses []net.UDPAddr
+	Addresses []byte
 }
 
+// TODO: Fix variable names
 func newAddrArrayFrame(stream uint32, addresses []net.UDPAddr) frame {
+	addrByte2 := make([]byte,0)
+	for _,address := range addresses {
+		addrByte := []byte(address.String())
+		for _, Byte := range addrByte {
+			addrByte2 = append(addrByte2, Byte)
+		}
+
+		addrByte2 = append(addrByte2, byte('#'))
+	}
+
 	return newFrame(stream,
 		&addrArrayFrame{
 			kFrameTypeAdd,
-			addresses,
+			addrByte2,
 		})
 }
 
@@ -385,15 +396,15 @@ func (f addrArrayFrame) getType() frameType {
 type addrModFrame struct {
 	Type    frameType
 	delete  operation
-	address net.UDPAddr
+	address []byte
 }
 
-func newAddrModFrame(stream uint32, delete operation, address net.UDPAddr) frame {
+func newAddrModFrame(stream uint32, delete operation, address string) frame {
 	return newFrame(stream,
 		&addrModFrame{
 			kFrameTypeMod,
 			delete,
-			address,
+			[]byte(address),
 		})
 }
 
