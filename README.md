@@ -38,5 +38,3 @@ QED depends on Minq (https://www.github.com/ekr/minq) for QUIC.
 ## Mint
 
 Minq depends on Mint (https://www.github.com/bifurcation/mint) for TLS.
-Currently Mint master should work, but occasionally I will have to be on
-a branch. Will try to keep this updated.
