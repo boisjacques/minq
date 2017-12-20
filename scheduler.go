@@ -206,7 +206,7 @@ func (s *Scheduler) assebleAddrArrayFrame() []frame {
 		arr = append(arr, *v)
 	}
 	frames := make([]frame, 0)
-	frame := newAddrArrayFrame(0, arr)
+	frame := newAddrArrayFrame(arr)
 	frames = append(frames, frame)
 	s.connection.log(logTypeMultipath, "Assembled frame", frame)
 	return frames
@@ -214,7 +214,7 @@ func (s *Scheduler) assebleAddrArrayFrame() []frame {
 
 func (s *Scheduler) assembleAddrModFrame(delete operation, addr string) []frame {
 	frames := make([]frame, 0)
-	frame := newAddrModFrame(0, delete, addr)
+	frame := newAddrModFrame(delete, addr)
 	frames = append(frames, frame)
 	s.connection.log(logTypeMultipath, "Assembled frame", frame)
 	return frames

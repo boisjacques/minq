@@ -1,6 +1,7 @@
 package minq
 
 import (
+	"debug/dwarf"
 	"fmt"
 	"net"
 	"time"
@@ -23,6 +24,7 @@ const (
 	kFrameTypeNewConnectionId = frameType(0xb)
 	kFrameTypeAdd             = frameType(0xc)
 	kFrameTypeMod             = frameType(0xd)
+	kFrameTypePong            = frameType(0x0d)
 	kFrameTypeAck             = frameType(0xa0)
 	kFrameTypeStream          = frameType(0xc0)
 )
@@ -34,10 +36,10 @@ const (
 )
 
 const (
-	kAckHeaderLength = 20      // assume 64-bit variable length fields
-	kAckBlockEntryLength = 5   // assume 32-bit variable length fields
-	kMaxAckGap = 255
-	kMaxAckBlocks = 255
+	kAckHeaderLength     = 20 // assume 64-bit variable length fields
+	kAckBlockEntryLength = 5  // assume 32-bit variable length fields
+	kMaxAckGap           = 255
+	kMaxAckBlocks        = 255
 )
 
 type operation bool
@@ -53,13 +55,13 @@ type innerFrame interface {
 }
 
 type frame struct {
-	stream            uint32
-	f                 innerFrame
-	encoded           []byte
-	pns               []uint64
-	lostPns           []uint64
-	time              time.Time
-	needsTransmit     bool
+	stream        uint32
+	f             innerFrame
+	encoded       []byte
+	pns           []uint64
+	lostPns       []uint64
+	time          time.Time
+	needsTransmit bool
 }
 
 func (f frame) String() string {
@@ -291,12 +293,23 @@ func (f maxStreamIdFrame) getType() frameType {
 // PING
 type pingFrame struct {
 	Type frameType
+	data []byte
 }
 
 func newPingFrame() frame {
 	return newFrame(0,
 		&pingFrame{
-			kFrameTypePing})
+			kFrameTypePing,
+			nil, // TODO: Inexplicable error may be here
+		})
+}
+
+func newPingFrameWithData(data []byte) frame {
+	return newFrame(0,
+		&pingFrame{
+			kFrameTypePing,
+			data,
+		})
 }
 
 func (f pingFrame) String() string {
@@ -370,9 +383,9 @@ type addrArrayFrame struct {
 }
 
 // TODO: Fix variable names
-func newAddrArrayFrame(stream uint32, addresses []net.UDPAddr) frame {
-	addrByte2 := make([]byte,0)
-	for _,address := range addresses {
+func newAddrArrayFrame(addresses []net.UDPAddr) frame {
+	addrByte2 := make([]byte, 0)
+	for _, address := range addresses {
 		addrByte := []byte(address.String())
 		for _, Byte := range addrByte {
 			addrByte2 = append(addrByte2, Byte)
@@ -381,7 +394,7 @@ func newAddrArrayFrame(stream uint32, addresses []net.UDPAddr) frame {
 		addrByte2 = append(addrByte2, byte('#'))
 	}
 
-	return newFrame(stream,
+	return newFrame(0,
 		&addrArrayFrame{
 			kFrameTypeAdd,
 			addrByte2,
@@ -404,8 +417,8 @@ type addrModFrame struct {
 	address []byte
 }
 
-func newAddrModFrame(stream uint32, delete operation, address string) frame {
-	return newFrame(stream,
+func newAddrModFrame(delete operation, address string) frame {
+	return newFrame(0,
 		&addrModFrame{
 			kFrameTypeMod,
 			delete,
@@ -419,6 +432,27 @@ func (f addrModFrame) String() string {
 
 func (f addrModFrame) getType() frameType {
 	return kFrameTypeMod
+}
+
+type pongFrame struct {
+	Type frameType
+	data []byte
+}
+
+func (f pongFrame) String() string {
+	return "PONG"
+}
+
+func (f pongFrame) getType() frameType {
+	return kFrameTypePong
+}
+
+func newPongFrame(data []byte) frame {
+	return newFrame(0,
+		&pongFrame{
+			kFrameTypePong,
+			data,
+		})
 }
 
 // ACK

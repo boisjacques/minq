@@ -1478,7 +1478,10 @@ func (c *Connection) processUnprotected(hdr *packetHeader, packetNumber uint64, 
 			}
 
 		case *pingFrame:
-			// TODO: Implement
+			frames := make([]frame, 0)
+			frames[0] = newPongFrame(inner.data)
+			c.sendFramesInPacket(packetType1RTTProtectedPhase1, frames)
+			c.log(logTypeMultipath, "Received PING frame, sent PONG")
 
 		case *addrArrayFrame:
 			c.log(logTypeMultipath, "Received address propagation on stream %v %x", inner.String(), inner.Addresses)
