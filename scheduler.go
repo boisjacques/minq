@@ -75,13 +75,22 @@ func (s *Scheduler) Send(p []byte) error {
 	tempPath := s.paths[s.pathIds[s.lastPath]]
 	err := tempPath.transport.Send(p)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println(err, util.Tracer())
 		return err
 	}
 	if s.lastPath == 0 {
 		s.connection.log(logTypeMultipath, "Packet sent. Used path zero")
 	} else {
 		s.connection.log(logTypeMultipath, "Packet sent. local: %v \n remote: %x", *s.paths[s.pathIds[int(s.lastPath)]].local, *s.paths[s.pathIds[int(s.lastPath)]].remote)
+	}
+	return nil
+}
+
+func (s *Scheduler) sendToPath(path uint32, p []byte) error {
+	err := s.paths[path].transport.Send(p)
+	if err != nil {
+		fmt.Println(err, util.Tracer())
+		return err
 	}
 	return nil
 }
