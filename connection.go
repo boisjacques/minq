@@ -173,8 +173,9 @@ func NewConnection(trans Transport, role uint8, tls TlsConfig, handler Connectio
 	c.log = newConnectionLogger(&c)
 	c.scheduler = NewScheduler(c.transport, &c, c.AddressHelper)
 	c.scheduler.initializePaths()
-	c.scheduler.measurePaths()
+	c.scheduler.measurePathsRunner()
 	c.scheduler.ListenOnChannel()
+	c.scheduler.weighPathsRunner()
 
 	//c.congestion = newCongestionControllerIetf(&c)
 	c.congestion = &CongestionControllerDummy{}

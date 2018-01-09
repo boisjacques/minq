@@ -7,7 +7,8 @@ type Path struct {
 	isPathZero bool
 	transport  Transport
 	pathID     uint32
-	metric     uint16
+	weight     int
+
 	owd        uint64
 	local      *net.UDPAddr
 	remote     *net.UDPAddr
@@ -19,7 +20,7 @@ func NewPath(connection *Connection, transport Transport, pathId uint32, local, 
 		false,
 		transport,
 		pathId,
-		200,
+		0,
 		0,
 		local,
 		local,
@@ -40,8 +41,8 @@ func (p *Path) updateMetric(referenceRTT uint16) uint16 {
 }
 */
 
-func (p *Path) GetMetric() uint16 {
-	return p.metric
+func (p *Path) GetWeight() int {
+	return p.weight
 }
 
 func (p *Path) GetPathID() uint32 {

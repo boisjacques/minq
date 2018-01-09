@@ -7,6 +7,9 @@ import (
 	"sync"
 	"time"
 	"hash/crc32"
+	"math/rand"
+	"errors"
+	"github.com/cloudflare/cfssl/transport"
 )
 
 type direcionAddr uint8
@@ -17,20 +20,21 @@ const (
 )
 
 type Scheduler struct {
-	paths          map[uint32]*Path
-	connection     *Connection
-	referenceRTT   uint16
-	pathZero       *Path
-	pathIds        []uint32
-	lastPath       uint32
-	addressHelper  *AddressHelper
-	addrChan       chan string
-	localAddrs     map[string]*net.UDPAddr
-	localAddrsBool map[string]bool
-	remoteAddrs    map[string]*net.UDPAddr
-	lockRemote     sync.RWMutex
-	lockPaths      sync.RWMutex
-	isInitialized  bool
+	paths          	map[uint32]*Path
+	connection     	*Connection
+	referenceRTT   	uint16
+	pathZero       	*Path
+	pathIds        	[]uint32
+	lastPath       	uint32
+	addressHelper  	*AddressHelper
+	addrChan       	chan string
+	localAddrs     	map[string]*net.UDPAddr
+	localAddrsBool 	map[string]bool
+	remoteAddrs    	map[string]*net.UDPAddr
+	lockRemote     	sync.RWMutex
+	lockPaths      	sync.RWMutex
+	isInitialized  	bool
+	totalPathWeight	int
 }
 
 func NewScheduler(initTrans Transport, connection *Connection, ah *AddressHelper) Scheduler {
@@ -40,7 +44,7 @@ func NewScheduler(initTrans Transport, connection *Connection, ah *AddressHelper
 		true,
 		initTrans,
 		0,
-		100,
+		1000,
 		0,
 		nil,
 		nil,
@@ -64,26 +68,34 @@ func NewScheduler(initTrans Transport, connection *Connection, ah *AddressHelper
 		sync.RWMutex{},
 		sync.RWMutex{},
 		false,
+		0,
 	}
 }
 
-// TODO: Implement proper scheduling, simple round robin right now
 func (s *Scheduler) Send(p []byte) error {
 	s.lockPaths.RLock()
 	defer s.lockPaths.RUnlock()
-	s.lastPath = (s.lastPath + 1) % uint32(len(s.pathIds))
-	tempPath := s.paths[s.pathIds[s.lastPath]]
-	err := tempPath.transport.Send(p)
+	path,err := s.weightedSelect()
 	if err != nil {
 		fmt.Println(err, util.Tracer())
 		return err
 	}
-	if s.lastPath == 0 {
+	err = path.transport.Send(p)
+	if err != nil {
+		fmt.Println(err, util.Tracer())
+		return err
+	}
+	if path.pathID == 0 {
 		s.connection.log(logTypeMultipath, "Packet sent. Used path zero")
 	} else {
 		s.connection.log(logTypeMultipath, "Packet sent. local: %v \n remote: %x", *s.paths[s.pathIds[int(s.lastPath)]].local, *s.paths[s.pathIds[int(s.lastPath)]].remote)
 	}
 	return nil
+}
+
+func (s *Scheduler) roundRobin() *Path {
+	s.lastPath = (s.lastPath + 1) % uint32(len(s.pathIds))
+	return s.paths[s.pathIds[s.lastPath]]
 }
 
 func (s *Scheduler) sendToPath(pathID uint32, p []byte) error {
@@ -319,18 +331,102 @@ func (s *Scheduler) setOwd(pathID uint32, owd int64){
 	s.paths[pathID].setOwd(owd)
 }
 
-func (s *Scheduler) measurePaths() {
+func (s *Scheduler) measurePathsRunner() {
 	go func() {
-		if s.connection.state == StateEstablished {
-			for _,path := range s.paths{
-				s.measurePath(path)
+		for {
+			if s.connection.state == StateEstablished {
+				s.measurePaths()
 			}
+			time.Sleep(100 * time.Millisecond)
 		}
-		time.Sleep(100 * time.Millisecond)
 	}()
 }
 
+// If deadlock lock here
+func (s *Scheduler) measurePaths() {
+	s.lockPaths.RLock()
+	s.connection.log(logTypeMutex, "locked: ", util.Tracer())
+	defer s.lockPaths.RUnlock()
+	defer s.connection.log(logTypeMutex, "unlocked: ", util.Tracer())
+	for _, path := range s.paths {
+		s.measurePath(path)
+	}
+}
+
 func (s *Scheduler) measurePath(path *Path) {
+	s.lockPaths.RLock()
+	s.connection.log(logTypeMutex, "locked: ", util.Tracer())
+	defer s.lockPaths.RUnlock()
+	defer s.connection.log(logTypeMutex, "unlocked: ", util.Tracer())
 	s.connection.sendFramesInPacket(packetType1RTTProtectedPhase1, s.assembleOwdFrame(path.pathID))
-	s.connection.log(logTypeMultipath, "Sent OWD Frame for ")
+	s.connection.log(logTypeMultipath, "Sent OWD Frame for %v", path.pathID)
+}
+
+func (s *Scheduler) sumUpWeights() {
+	s.lockPaths.RLock()
+	s.connection.log(logTypeMutex, "locked: ", util.Tracer())
+	defer s.lockPaths.RUnlock()
+	defer s.connection.log(logTypeMutex, "unlocked: ", util.Tracer())
+	s.totalPathWeight = 0
+	for _,path := range s.paths{
+		s.totalPathWeight += path.weight
+	}
+}
+
+func (s *Scheduler) weightedSelect() (*Path, error){
+	s.lockPaths.RLock()
+	s.connection.log(logTypeMutex, "locked: ", util.Tracer())
+	defer s.lockPaths.RUnlock()
+	defer s.connection.log(logTypeMutex, "unlocked: ", util.Tracer())
+	rand.Seed(time.Now().UnixNano())
+	r := rand.Intn(s.totalPathWeight)
+	for _, path := range s.paths {
+		r -= path.weight
+		if r <= 0 {
+			return path, nil
+		}
+	}
+	return &Path{}, errors.New("No path selected")
+}
+
+func (s *Scheduler) weighPathsRunner() {
+	go func() {
+		for {
+			if s.connection.state == StateEstablished {
+				s.weighPaths()
+			}
+			time.Sleep(100 * time.Millisecond)		}
+	}()
+}
+
+func (s *Scheduler) weighPaths() {s.lockPaths.Lock()
+	s.connection.log(logTypeMutex, "locked: ", util.Tracer())
+	defer s.lockPaths.Unlock()
+	defer s.connection.log(logTypeMutex, "unlocked: ", util.Tracer())
+	for _,path := range s.paths{
+		s.weighPath(path)
+	}
+}
+
+func (s *Scheduler) weighPath(path *Path){
+	if path.owd < s.calculateAverageOwd(){
+		if path.weight < 1000 {
+			path.weight = path.weight + 1
+		}
+	} else {
+		if path.weight > 1 {
+			path.weight = path.weight - 1
+		}
+	}
+}
+
+// TODO: Put moving avg. here
+func (s *Scheduler) calculateAverageOwd() uint64{
+	var aOwd uint64
+	for _,path := range s.paths{
+		aOwd += path.owd
+	}
+	aOwd = aOwd / uint64(len(s.paths))
+	s.connection.log(logTypeMultipath, "Average OWD is: %v", aOwd)
+	return aOwd
 }
