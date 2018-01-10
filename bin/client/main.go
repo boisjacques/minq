@@ -116,7 +116,7 @@ func main() {
 		serverName = host
 	}
 
-	uaddr, err := net.ResolveUDPAddr("udp", addr + ":4433")
+	uaddr, err := net.ResolveUDPAddr("udp", addr)
 	if err != nil {
 		log.Println("Invalid UDP addr", err)
 		return
