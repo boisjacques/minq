@@ -113,10 +113,10 @@ func main() {
 		if err != nil {
 			log.Println("Couldn't split host/port", err)
 		}
-		serverName = host + ":4433"
+		serverName = host
 	}
 
-	uaddr, err := net.ResolveUDPAddr("udp", addr)
+	uaddr, err := net.ResolveUDPAddr("udp", addr + ":4433")
 	if err != nil {
 		log.Println("Invalid UDP addr", err)
 		return

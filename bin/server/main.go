@@ -253,9 +253,8 @@ func main() {
 		host, _, err := net.SplitHostPort(addr)
 		if err != nil {
 			log.Println("Couldn't split host/port", err)
-			return
 		}
-		serverName = host + ":4433"
+		serverName = host
 	}
 
 	config := minq.NewTlsConfig(serverName)
