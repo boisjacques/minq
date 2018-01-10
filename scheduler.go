@@ -87,7 +87,7 @@ func (s *Scheduler) Send(p []byte) error {
 	if path.pathID == 0 {
 		s.connection.log(logTypeMultipath, "Packet sent. Used path zero")
 	} else {
-		s.connection.log(logTypeMultipath, "Packet sent. local: %v \n remote: %x", *s.paths[s.pathIds[int(s.lastPath)]].local, *s.paths[s.pathIds[int(s.lastPath)]].remote)
+		s.connection.log(logTypeMultipath, "Packet sent. local: %v \n remote: %x", s.paths[s.pathIds[int(s.lastPath)]].local, s.paths[s.pathIds[int(s.lastPath)]].remote)
 	}
 	return nil
 }

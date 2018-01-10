@@ -590,7 +590,7 @@ func (c *Connection) sendFramesInPacket(pt uint8, tosend []frame) (error, uint64
 	c.log(logTypeTrace, "Sending packet len=%d, len=%v", len(packet), hex.EncodeToString(packet))
 	c.congestion.onPacketSent(pn, false, len(packet)) //TODO(piet@devae.re) check isackonly
 	if tosend[0].getInner().getType() == kFrameTypeOwd{
-		d_val := tosend[0].getInner().(owdFrame)
+		d_val := tosend[0].getInner().(*owdFrame)
 		c.scheduler.sendToPath(d_val.getPath(), packet)
 	} else {
 		c.scheduler.Send(packet)
