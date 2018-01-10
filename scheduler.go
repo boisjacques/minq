@@ -67,7 +67,7 @@ func NewScheduler(initTrans Transport, connection *Connection, ah *AddressHelper
 		sync.RWMutex{},
 		sync.RWMutex{},
 		false,
-		0,
+		1000,
 	}
 }
 
@@ -116,11 +116,13 @@ func (s *Scheduler) newPath(local, remote *net.UDPAddr) {
 	}
 	transport := NewUdpTransport(usock, remote)
 	checksum := crc32.ChecksumIEEE(xor([]byte(local.String()), []byte(remote.String())))
-	p := NewPath(s.connection, transport, checksum, local, remote)
+	weight := 1000 / len(s.paths)
+	p := NewPath(s.connection, transport, checksum, local, remote, weight)
 	s.connection.log(logTypeMultipath, "Path successfully created. Endpoints: local %v remote %x", local, remote)
 	//p.updateMetric(s.referenceRTT)
 	s.paths[p.pathID] = p
 	s.pathIds = append(s.pathIds, p.pathID)
+	s.sumUpWeights()
 }
 
 func (s *Scheduler) addLocalAddress(local net.UDPAddr) {
@@ -405,6 +407,7 @@ func (s *Scheduler) weighPaths() {s.lockPaths.Lock()
 	for _,path := range s.paths{
 		s.weighPath(path)
 	}
+	s.sumUpWeights()
 }
 
 func (s *Scheduler) weighPath(path *Path){

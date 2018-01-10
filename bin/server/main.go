@@ -219,7 +219,7 @@ func logFunc(format string, args ...interface{}) {
 }
 
 func main() {
-	flag.StringVar(&addr, "addr", "", "[host:port]")
+	flag.StringVar(&addr, "addr", "", "[host]")
 	flag.StringVar(&serverName, "server-name", "", "[SNI]")
 	flag.StringVar(&keyFile, "key", "", "Key file")
 	flag.StringVar(&certFile, "cert", "", "Cert file")
@@ -255,7 +255,7 @@ func main() {
 			log.Println("Couldn't split host/port", err)
 			return
 		}
-		serverName = host
+		serverName = host + ":4433"
 	}
 
 	config := minq.NewTlsConfig(serverName)

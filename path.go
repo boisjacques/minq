@@ -14,13 +14,13 @@ type Path struct {
 	remote     *net.UDPAddr
 }
 
-func NewPath(connection *Connection, transport Transport, pathId uint32, local, remote *net.UDPAddr) *Path {
+func NewPath(connection *Connection, transport Transport, pathId uint32, local, remote *net.UDPAddr, weight int) *Path {
 	return &Path{
 		connection,
 		false,
 		transport,
 		pathId,
-		0,
+		weight,
 		0,
 		local,
 		local,

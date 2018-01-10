@@ -78,7 +78,7 @@ func readUDP(s *net.UDPConn) ([]byte, error) {
 
 func main() {
 	log.Println("PID=", os.Getpid())
-	flag.StringVar(&addr, "addr", "localhost:4433", "[host:port]")
+	flag.StringVar(&addr, "addr", "localhost:4433", "[host]")
 	flag.StringVar(&serverName, "server-name", "", "SNI")
 	flag.StringVar(&doHttp, "http", "", "Do HTTP/0.9 with provided URL")
 	flag.IntVar(&httpCount, "httpCount", 1, "Number of parallel HTTP requests to start")
@@ -113,7 +113,7 @@ func main() {
 		if err != nil {
 			log.Println("Couldn't split host/port", err)
 		}
-		serverName = host
+		serverName = host + ":4433"
 	}
 
 	uaddr, err := net.ResolveUDPAddr("udp", addr)
