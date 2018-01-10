@@ -9,7 +9,6 @@ import (
 	"hash/crc32"
 	"math/rand"
 	"errors"
-	"github.com/cloudflare/cfssl/transport"
 )
 
 type direcionAddr uint8
