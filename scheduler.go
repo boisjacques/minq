@@ -329,6 +329,10 @@ func (s *Scheduler) write(addr string) {
 }
 
 func (s *Scheduler) setOwd(pathID uint32, owd int64){
+	s.lockPaths.Lock()
+	s.connection.log(logTypeMutex, "locked: ", util.Tracer())
+	defer s.lockPaths.Unlock()
+	defer s.connection.log(logTypeMutex, "unlocked: ", util.Tracer())
 	s.paths[pathID].setOwd(owd)
 }
 
@@ -401,9 +405,6 @@ func (s *Scheduler) weighPathsRunner() {
 }
 
 func (s *Scheduler) weighPaths() {s.lockPaths.Lock()
-	s.connection.log(logTypeMutex, "locked: ", util.Tracer())
-	defer s.lockPaths.Unlock()
-	defer s.connection.log(logTypeMutex, "unlocked: ", util.Tracer())
 	for _,path := range s.paths{
 		s.weighPath(path)
 	}
@@ -411,6 +412,10 @@ func (s *Scheduler) weighPaths() {s.lockPaths.Lock()
 }
 
 func (s *Scheduler) weighPath(path *Path){
+	s.lockPaths.Lock()
+	s.connection.log(logTypeMutex, "locked: ", util.Tracer())
+	defer s.lockPaths.Unlock()
+	defer s.connection.log(logTypeMutex, "unlocked: ", util.Tracer())
 	if path.owd < s.calculateAverageOwd(){
 		if path.weight < 1000 {
 			path.weight = path.weight + 1
