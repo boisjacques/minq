@@ -1520,7 +1520,7 @@ func (c *Connection) processUnprotected(hdr *packetHeader, packetNumber uint64, 
 		case *owdFrame:
 			owd := timestamp - inner.time
 			frames := make([]frame, 0)
-			frames[0] = newOwdAckFrame(inner.pathID, owd)
+			frames = append(frames, newOwdAckFrame(inner.pathID, owd))
 			c.sendFramesInPacket(packetType1RTTProtectedPhase1, frames)
 			t2 := time.Now().UnixNano()
 			offset := t2 - timestamp
