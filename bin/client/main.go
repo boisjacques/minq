@@ -9,9 +9,7 @@ import (
 	"os"
 	"runtime/pprof"
 	"time"
-	"runtime"
 	"runtime/trace"
-	"io"
 )
 
 var addr string
