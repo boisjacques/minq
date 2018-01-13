@@ -93,13 +93,12 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	defer f.Close()
 
 	err = trace.Start(f)
 	if err != nil {
 		panic(err)
 	}
-
-	defer f.Close()
 	defer trace.Stop()
 
 	if logToFile {

@@ -1,3 +1,4 @@
 export "MINQ_LOG"=mp,mutex
-rm clientLog
-go run main.go -addr=192.168.178.60:4433
+rm clientlog
+go build -o clnt main.go
+./clnt -addr=192.168.178.60:4433
