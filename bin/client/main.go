@@ -10,6 +10,7 @@ import (
 	"runtime/pprof"
 	"time"
 	"runtime/trace"
+	"os/signal"
 )
 
 var addr string
@@ -92,12 +93,13 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	defer f.Close()
 
 	err = trace.Start(f)
 	if err != nil {
 		panic(err)
 	}
+
+	defer f.Close()
 	defer trace.Stop()
 
 	if logToFile {
@@ -238,7 +240,18 @@ func main() {
 		}
 	}
 
-	for {
+	running := true
+	signalChan := make(chan os.Signal, 1)
+	sigChan := make(chan bool)
+	signal.Notify(signalChan, os.Interrupt)
+	go func() {
+		for _ = range signalChan {
+			fmt.Println("\nReceived an interrupt, stopping services...\n")
+			sigChan <- false
+		}
+	}()
+
+	for running {
 		select {
 		case u := <-udpin:
 			if len(u) == 0 {
@@ -260,6 +273,6 @@ func main() {
 				return
 			}
 		}
-
+	running =<- sigChan
 	}
 }

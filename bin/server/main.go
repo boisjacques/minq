@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 	"runtime/trace"
+	"os/signal"
 )
 
 var addr string
@@ -365,7 +366,18 @@ func main() {
 		}()
 	*/
 
-	for {
+	running := true
+	signalChan := make(chan os.Signal, 1)
+	sigChan := make(chan bool)
+	signal.Notify(signalChan, os.Interrupt)
+	go func() {
+		for _ = range signalChan {
+			fmt.Println("\nReceived an interrupt, stopping services...\n")
+			sigChan <- false
+		}
+	}()
+
+	for running {
 
 		select {
 		case _, open := <-stdin:
@@ -406,5 +418,6 @@ func main() {
 
 		// Check the timers.
 		server.CheckTimer()
+		running = <-sigChan
 	}
 }
