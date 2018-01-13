@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"runtime/trace"
 )
 
 var addr string
@@ -233,6 +234,18 @@ func main() {
 
 	var key crypto.Signer
 	var certChain []*x509.Certificate
+
+	f, err := os.Create("trace.out")
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+
+	err = trace.Start(f)
+	if err != nil {
+		panic(err)
+	}
+	defer trace.Stop()
 
 	if cpuProfile != "" {
 		f, err := os.Create(cpuProfile)

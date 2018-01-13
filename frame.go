@@ -501,11 +501,11 @@ type owdAckFrame struct {
 }
 
 func (f owdAckFrame) String() string {
-	return "OWD"
+	return "OWD_ACK"
 }
 
 func (f owdAckFrame) getType() frameType {
-	return kFrameTypeOwd
+	return kFrameTypeOwdAck
 }
 
 func newOwdAckFrame(pathID uint32, owd int64) frame {

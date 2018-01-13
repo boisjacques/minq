@@ -9,6 +9,9 @@ import (
 	"os"
 	"runtime/pprof"
 	"time"
+	"runtime"
+	"runtime/trace"
+	"io"
 )
 
 var addr string
@@ -87,8 +90,20 @@ func main() {
 	flag.BoolVar(&logToFile, "log-to-file", true, "Log to file")
 	flag.Parse()
 
+	f, err := os.Create("trace.out")
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+
+	err = trace.Start(f)
+	if err != nil {
+		panic(err)
+	}
+	defer trace.Stop()
+
 	if logToFile {
-		logFile, err := os.OpenFile("clientLog", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+		logFile, err := os.OpenFile("clientlog", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
 		if err != nil {
 			panic(err)
 		}

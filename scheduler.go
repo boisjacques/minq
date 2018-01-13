@@ -347,12 +347,8 @@ func (s *Scheduler) measurePathsRunner() {
 	}()
 }
 
-// If deadlock lock here
+// If deadlock look here
 func (s *Scheduler) measurePaths() {
-	s.lockPaths.RLock()
-	s.connection.log(logTypeMutex, "locked: ", util.Tracer())
-	defer s.lockPaths.RUnlock()
-	defer s.connection.log(logTypeMutex, "unlocked: ", util.Tracer())
 	for _, path := range s.paths {
 		s.measurePath(path)
 	}
