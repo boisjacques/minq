@@ -46,6 +46,8 @@ func serverInputAll(t *testing.T, trans *testTransport, s *Server, u net.UDPAddr
 }
 
 func TestServer(t *testing.T) {
+	ah := NewAddressHelper()
+
 	// Have the client and server do a handshake.
 	u, _ := net.ResolveUDPAddr("udp", "127.0.0.1:4443") // Just a fixed address
 
@@ -56,7 +58,7 @@ func TestServer(t *testing.T) {
 	server := NewServer(factory, testTlsConfig, nil)
 	assertNotNil(t, server, "Couldn't make server")
 
-	client := NewConnection(cTrans, RoleClient, testTlsConfig, nil)
+	client := NewConnection(cTrans, RoleClient, testTlsConfig, nil, ah)
 	assertNotNil(t, client, "Couldn't make client")
 
 	n, err := client.CheckTimer()
@@ -78,7 +80,7 @@ func TestServer(t *testing.T) {
 	u2, _ := net.ResolveUDPAddr("udp", "127.0.0.1:4444") // Just a fixed address
 	cTrans2, sTrans2 := newTestTransportPair(true)
 	factory.addTransport(u2, sTrans2)
-	client = NewConnection(cTrans2, RoleClient, testTlsConfig, nil)
+	client = NewConnection(cTrans2, RoleClient, testTlsConfig, nil, ah)
 	assertNotNil(t, client, "Couldn't make client")
 
 	n, err = client.CheckTimer()
@@ -93,6 +95,8 @@ func TestServer(t *testing.T) {
 }
 
 func TestServerIdleTimeout(t *testing.T) {
+	ah := NewAddressHelper()
+
 	// Have the client and server do a handshake.
 	u, _ := net.ResolveUDPAddr("udp", "127.0.0.1:4443") // Just a fixed address
 
@@ -103,7 +107,7 @@ func TestServerIdleTimeout(t *testing.T) {
 	server := NewServer(factory, testTlsConfig, nil)
 	assertNotNil(t, server, "Couldn't make server")
 
-	client := NewConnection(cTrans, RoleClient, testTlsConfig, nil)
+	client := NewConnection(cTrans, RoleClient, testTlsConfig, nil, ah)
 	assertNotNil(t, client, "Couldn't make client")
 
 	n, err := client.CheckTimer()

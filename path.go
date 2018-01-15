@@ -8,7 +8,6 @@ type Path struct {
 	transport  Transport
 	pathID     uint32
 	weight     int
-
 	owd        uint64
 	local      *net.UDPAddr
 	remote     *net.UDPAddr

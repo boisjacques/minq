@@ -112,11 +112,18 @@ func (s *Scheduler) newPath(local, remote *net.UDPAddr) {
 	if err != nil {
 		s.connection.log(logTypeMultipath, "Error while creating path local IP: %x remote IP %v", *local, *remote)
 		s.connection.log(logTypeMultipath, "Following error occurred", err)
+		fmt.Println("Path could not be created")
+		fmt.Println(err)
 		return
 	}
 	transport := NewUdpTransport(usock, remote)
 	checksum := crc32.ChecksumIEEE(xor([]byte(local.String()), []byte(remote.String())))
-	weight := 1000 / len(s.paths)
+	var weight int
+	if len(s.paths) == 0{
+		weight = 1000
+	} else {
+		weight = 1000 / len(s.paths)
+	}
 	p := NewPath(s.connection, transport, checksum, local, remote, weight)
 	s.connection.log(logTypeMultipath, "Path successfully created. Endpoints: local %v remote %x", local, remote)
 	//p.updateMetric(s.referenceRTT)
