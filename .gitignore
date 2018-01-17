@@ -4,3 +4,7 @@
 clientLog
 
 serverlog
+
+bin/server/server
+
+bin/client/trace\.out
