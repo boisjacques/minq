@@ -195,7 +195,10 @@ func (h *transportParametersHandler) Receive(hs mint.HandshakeType, el *mint.Ext
 	logf(logTypeHandshake, "TransportParametersHandler message=%d", hs)
 	// First see if the other side sent the extension.
 	var body transportParametersXtnBody
-	ok := el.Find(&body)
+	ok,err := el.Find(&body)
+	if err != nil{
+		return err
+	}
 
 	h.log(logTypeTrace, "Retrieved transport parameters len=%d %v", len(body.body), hex.EncodeToString(body.body))
 	var params *TransportParameterList
@@ -256,7 +259,6 @@ func (h *transportParametersHandler) Receive(hs mint.HandshakeType, el *mint.Ext
 	// Now try to process each param.
 	// TODO(ekr@rtfm.com): Enforce that each param appears only once.
 	var tp transportParameters
-	var err error
 	h.log(logTypeHandshake, "Reading transport parameters values")
 	tp.maxStreamsData, err = params.getUintParameter(kTpIdInitialMaxStreamsData, 4)
 	if err != nil {

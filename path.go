@@ -8,7 +8,7 @@ type Path struct {
 	transport  Transport
 	pathID     uint32
 	metric     uint16
-	rtt        uint16
+	owd        uint64
 	local      *net.UDPAddr
 	remote     *net.UDPAddr
 }
@@ -36,7 +36,7 @@ func (p *Path) updateMetric(referenceRTT uint16) uint16 {
 	p.connection.send
 	b := make([]byte, 1024)
 	p.connection.streams[0].Read(b)
-	return rtt
+	return owd
 }
 */
 
@@ -46,6 +46,10 @@ func (p *Path) GetMetric() uint16 {
 
 func (p *Path) GetPathID() uint32 {
 	return p.pathID
+}
+
+func (p *Path) setOwd(owd int64) {
+	p.owd = uint64(owd)
 }
 
 func (p *Path) String() string {

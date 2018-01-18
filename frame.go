@@ -23,7 +23,9 @@ const (
 	kFrameTypeNewConnectionId = frameType(0xb)
 	kFrameTypeAdd             = frameType(0xc)
 	kFrameTypeMod             = frameType(0xd)
-	kFrameTypePong            = frameType(0x0d)
+	kFrameTypePong            = frameType(0xe)
+	kFrameTypeOwd			  =	frameType(0xf)
+	kFrameTypeOwdAck		  = frameType(0x11)
 	kFrameTypeAck             = frameType(0xa0)
 	kFrameTypeStream          = frameType(0xc0)
 )
@@ -90,6 +92,10 @@ func (f *frame) length() (int, error) {
 	return len(f.encoded), nil
 }
 
+func (f *frame) getInner() innerFrame {
+	return f.f
+}
+
 // Decode an arbitrary frame.
 func decodeFrame(data []byte) (uintptr, *frame, error) {
 	var inner innerFrame
@@ -124,6 +130,10 @@ func decodeFrame(data []byte) (uintptr, *frame, error) {
 		inner = &addrArrayFrame{}
 	case t == uint8(kFrameTypeMod):
 		inner = &addrModFrame{}
+	case t == uint8(kFrameTypeOwd):
+		inner = &owdFrame{}
+	case t == uint8(kFrameTypeOwdAck):
+		inner = &owdAckFrame{}
 	case t >= uint8(kFrameTypeAck) && t <= 0xbf:
 		inner = &ackFrame{}
 	case t >= uint8(kFrameTypeStream):
@@ -433,6 +443,7 @@ func (f addrModFrame) getType() frameType {
 	return kFrameTypeMod
 }
 
+// PONG
 type pongFrame struct {
 	Type frameType
 	data []byte
@@ -451,6 +462,58 @@ func newPongFrame(data []byte) frame {
 		&pongFrame{
 			kFrameTypePong,
 			data,
+		})
+}
+
+// OWD
+type owdFrame struct {
+	Type 	frameType
+	pathID	uint32
+	time 	int64
+}
+
+func (f owdFrame) String() string {
+	return "OWD"
+}
+
+func (f owdFrame) getType() frameType {
+	return kFrameTypeOwd
+}
+
+func (f owdFrame) getPath() uint32 {
+	return f.pathID
+}
+
+func newOwdFrame(pathID uint32) frame {
+	return newFrame(0,
+		&owdFrame{
+			kFrameTypeOwd,
+			pathID,
+			time.Now().UnixNano(),
+		})
+}
+
+// OWD_ACK
+type owdAckFrame struct {
+	Type 	frameType
+	pathID	uint32
+	owd		int64
+}
+
+func (f owdAckFrame) String() string {
+	return "OWD"
+}
+
+func (f owdAckFrame) getType() frameType {
+	return kFrameTypeOwd
+}
+
+func newOwdAckFrame(pathID uint32, owd int64) frame {
+	return newFrame(0,
+		&owdAckFrame{
+			kFrameTypeOwdAck,
+			pathID,
+			owd,
 		})
 }
 

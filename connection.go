@@ -173,6 +173,7 @@ func NewConnection(trans Transport, role uint8, tls TlsConfig, handler Connectio
 	c.log = newConnectionLogger(&c)
 	c.scheduler = NewScheduler(c.transport, &c, c.AddressHelper)
 	c.scheduler.initializePaths()
+	c.scheduler.measurePaths()
 	c.scheduler.ListenOnChannel()
 
 	//c.congestion = newCongestionControllerIetf(&c)
@@ -577,7 +578,6 @@ func (c *Connection) sendFramesInPacket(pt uint8, tosend []frame) (error, uint64
 		}
 
 		assert(l <= left)
-
 		c.log(logTypeTrace, "Frame=%v", hex.EncodeToString(f.encoded))
 		p.payload = append(p.payload, f.encoded...)
 		sent++
@@ -588,7 +588,12 @@ func (c *Connection) sendFramesInPacket(pt uint8, tosend []frame) (error, uint64
 
 	c.log(logTypeTrace, "Sending packet len=%d, len=%v", len(packet), hex.EncodeToString(packet))
 	c.congestion.onPacketSent(pn, false, len(packet)) //TODO(piet@devae.re) check isackonly
-	c.scheduler.Send(packet)
+	if tosend[0].getInner().getType() == kFrameTypeOwd{
+		d_val := tosend[0].getInner().(owdFrame)
+		c.scheduler.sendToPath(d_val.getPath(), packet)
+	} else {
+		c.scheduler.Send(packet)
+	}
 
 	return nil, p.PacketNumber
 }
@@ -1393,6 +1398,7 @@ func (c *Connection) issueStreamCredit(s *Stream, credit int) error {
 }
 
 func (c *Connection) processUnprotected(hdr *packetHeader, packetNumber uint64, payload []byte, naf *bool) error {
+	timestamp := time.Now().UnixNano()
 	c.log(logTypeHandshake, "Reading unprotected data in state %v", c.state)
 	c.log(logTypeConnection, "Received Packet=%v", dumpPacket(payload))
 	*naf = false
@@ -1509,6 +1515,20 @@ func (c *Connection) processUnprotected(hdr *packetHeader, packetNumber uint64, 
 			} else {
 				c.scheduler.addRemoteAddress(remote)
 			}
+
+		case *owdFrame:
+			owd := timestamp - inner.time
+			frames := make([]frame, 0)
+			frames[0] = newOwdAckFrame(inner.pathID, owd)
+			c.sendFramesInPacket(packetType1RTTProtectedPhase1, frames)
+			t2 := time.Now().UnixNano()
+			offset := t2 - timestamp
+			c.log(logTypeMultipath, "Received OWD frame, sent OWD_ACK")
+			c.log(logTypeMultipath, "Offset: %v", offset)
+
+		case *owdAckFrame:
+			c.scheduler.setOwd(inner.pathID, inner.owd)
+
 		default:
 			c.log(logTypeConnection, "Received unexpected frame type")
 		}
