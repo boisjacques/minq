@@ -3,10 +3,10 @@ package minq
 import (
 	"fmt"
 	"github.com/boisjacques/golang-utils"
+	"hash/adler32"
 	"net"
 	"sync"
 	"time"
-	"hash/crc32"
 )
 
 type direcionAddr uint8
@@ -17,7 +17,7 @@ const (
 )
 
 type Scheduler struct {
-	paths          map[uint32]*Path
+	paths          map[uint32]Path
 	connection     *Connection
 	referenceRTT   uint16
 	pathZero       *Path
@@ -45,8 +45,8 @@ func NewScheduler(initTrans Transport, connection *Connection, ah *AddressHelper
 		nil,
 		nil,
 	}
-	paths := make(map[uint32]*Path)
-	paths[pathZero.pathID] = pathZero
+	paths := make(map[uint32]Path)
+	paths[pathZero.pathID] = *pathZero
 	pathIds := make([]uint32, 0)
 	pathIds = append(pathIds, pathZero.pathID)
 	return Scheduler{
@@ -86,8 +86,8 @@ func (s *Scheduler) Send(p []byte) error {
 	return nil
 }
 
-func (s *Scheduler) sendToPath(pathID uint32, p []byte) error {
-	err := s.paths[pathID].transport.Send(p)
+func (s *Scheduler) sendToPath(path uint32, p []byte) error {
+	err := s.paths[path].transport.Send(p)
 	if err != nil {
 		fmt.Println(err, util.Tracer())
 		return err
@@ -95,6 +95,7 @@ func (s *Scheduler) sendToPath(pathID uint32, p []byte) error {
 	return nil
 }
 
+// TODO: Consider using CRC32 instead of adler32
 // TODO: Implement proper source address handling
 func (s *Scheduler) newPath(local, remote *net.UDPAddr) {
 	usock, err := s.addressHelper.openSocket(local)
@@ -104,11 +105,11 @@ func (s *Scheduler) newPath(local, remote *net.UDPAddr) {
 		return
 	}
 	transport := NewUdpTransport(usock, remote)
-	checksum := crc32.ChecksumIEEE(xor([]byte(local.String()), []byte(remote.String())))
+	checksum := adler32.Checksum(xor([]byte(local.String()), []byte(remote.String())))
 	p := NewPath(s.connection, transport, checksum, local, remote)
 	s.connection.log(logTypeMultipath, "Path successfully created. Endpoints: local %v remote %x", local, remote)
 	//p.updateMetric(s.referenceRTT)
-	s.paths[p.pathID] = p
+	s.paths[p.pathID] = *p
 	s.pathIds = append(s.pathIds, p.pathID)
 }
 
@@ -135,7 +136,7 @@ func (s *Scheduler) addRemoteAddress(remote *net.UDPAddr) {
 	}
 	remoteAdded := true
 	if remoteAdded {
-		//For breakpoints only
+
 	}
 }
 
@@ -228,14 +229,6 @@ func (s *Scheduler) assembleAddrModFrame(delete operation, addr string) []frame 
 	return frames
 }
 
-func (s *Scheduler) assembleOwdFrame(pathId uint32) []frame {
-	frames := make([]frame, 0)
-	frame := newOwdFrame(pathId)
-	frames = append(frames, frame)
-	s.connection.log(logTypeMultipath, "Assembled frame", frame)
-	return frames
-}
-
 func xor(local, remote []byte) []byte {
 	rval := make([]byte, 0)
 	for i := 0; i < len(local); i++ {
@@ -313,24 +306,4 @@ func (s *Scheduler) write(addr string) {
 	defer s.addressHelper.lockAddresses.Unlock()
 	defer s.connection.log(logTypeMutex, "unlocked: ", util.Tracer())
 	s.localAddrsBool[addr] = false
-}
-
-func (s *Scheduler) setOwd(pathID uint32, owd int64){
-	s.paths[pathID].setOwd(owd)
-}
-
-func (s *Scheduler) measurePaths() {
-	go func() {
-		if s.connection.state == StateEstablished {
-			for _,path := range s.paths{
-				s.measurePath(path)
-			}
-		}
-		time.Sleep(100 * time.Millisecond)
-	}()
-}
-
-func (s *Scheduler) measurePath(path *Path) {
-	s.connection.sendFramesInPacket(packetType1RTTProtectedPhase1, s.assembleOwdFrame(path.pathID))
-	s.connection.log(logTypeMultipath, "Sent OWD Frame for ")
 }

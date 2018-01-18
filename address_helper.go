@@ -52,9 +52,10 @@ func (a *AddressHelper) GatherAddresses() {
 		flags := iface.Flags.String()
 		if !strings.Contains(flags, "loopback") {
 			addrs, _ := iface.Addrs()
+			ipv6 := false
 			for _, addr := range addrs {
-				//TODO: Fix link local addresses, add 169.254.0.0/16
-				if !isLinkLocal(addr.String()) {
+				if !(strings.Contains(addr.String(), "127") ||
+					strings.Contains(addr.String(), "fe80")) {
 					if strings.Contains(addr.String(), ":") {
 
 					}
@@ -70,14 +71,19 @@ func (a *AddressHelper) GatherAddresses() {
 							a.write(udpAddr, true)
 						}
 						if !a.containsAddress(udpAddr) {
-							a.write(udpAddr, true)
-							a.Publish(udpAddr.String())
+							if (udpAddr.IP.To4 != nil) || (ipv6 == false && udpAddr.IP.To4() == nil) {
+								if udpAddr.IP.To4() == nil {
+									ipv6 = true
+								}
+								a.write(udpAddr, true)
+								a.Publish(udpAddr.String())
 							}
 						}
 					}
 				}
 			}
 		}
+	}
 	a.cleanUp()
 }
 
@@ -105,7 +111,7 @@ func (a *AddressHelper) cleanUp() {
 	for key, value := range a.ipAddressesBool {
 		if value == false {
 			a.Publish(key)
-			time.Sleep(100 * time.Millisecond) //Wait 100 ms for handling in scheduler
+			time.Sleep(1000) //Wait 1 ms for handling in scheduler
 			delete(a.ipAddresses, key)
 			a.sockets[key].Close()
 		}
@@ -158,20 +164,5 @@ func (a *AddressHelper) falsifyAddresses() {
 	defer log.Println("unlocked: ", util.Tracer())
 	for address := range a.ipAddresses {
 		a.ipAddressesBool[address] = false
-	}
-}
-
-func isLinkLocal(addr string) bool {
-	three := addr[0:3]
-	four :=addr[0:4]
-	seven := addr[0:7]
-	if three == "127" {
-		return true
-	} else if four == "fe80" {
-		return true
-	} else if seven == "169.254" {
-		return true
-	} else {
-		return false
 	}
 }
