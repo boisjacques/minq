@@ -160,7 +160,7 @@ func NewConnection(trans Transport, role uint8, tls TlsConfig, handler Connectio
 		nil,
 		make(map[uint64]ackRanges, 0),
 		time.Now(),
-		100, // 100 seconds idle timeout
+		5, // 5 seconds idle timeout
 		nil,
 		nil,
 		kDefaultInitialRtt,
