@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	filename := os.Args[0]
+	filename := os.Args[1]
 	b, err := ioutil.ReadFile(filename)
 	if err != nil {
 		fmt.Print(err)
