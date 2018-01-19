@@ -93,7 +93,6 @@ wait
 
 # Result Delay
 diff alice.txt flipped-delay.result > /dev/null
-wait
 if [ $? -eq 0 ]; then
 	echo "Delay test passed without errors"
 elif [ $? -eq 1 ]; then
@@ -104,7 +103,6 @@ fi
 
 # Result Loss
 diff alice.txt flipped-loss.result > /dev/null
-wait
 if [ $? -eq 0 ]; then
         echo "Loss test passed without errors"
 elif [ $? -eq 1 ]; then
