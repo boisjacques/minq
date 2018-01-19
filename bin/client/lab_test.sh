@@ -1,12 +1,12 @@
 #!/bin/bash
 
 activate_loss () {
-	sudo tc qdisc change dev enp3s0f0 root netem loss 5% 25%
+	sudo tc qdisc add dev enp3s0f0 root netem loss 5% 25%
 	if [ $? -ne 0 ]; then
 		echo "Adding loss failed on enp3s0f0"
 		exit 1
 	fi
-	sudo tc qdisc change dev enp3s0f1 root netem loss 2% 25%
+	sudo tc qdisc add dev enp3s0f1 root netem loss 2% 25%
 	if [ $? -ne 0 ]; then
 		echo "Adding loss failed on enp3s0f1"
 		exit 1
@@ -15,12 +15,12 @@ activate_loss () {
 }
 
 activate_reordering () {
-	sudo tc qdisc change dev enp3s0f0 root netem gap 5 delay 10ms
+	sudo tc qdisc add dev enp3s0f0 root netem gap 5 delay 10ms
 	if [ $? -ne 0 ]; then
 		echo "Adding reordering failed on enp3s0f0"
 		exit 1
 	fi
-	sudo tc qdisc change dev enp3s0f1 root netem gap 2 delay 45ms
+	sudo tc qdisc add dev enp3s0f1 root netem gap 2 delay 45ms
 	if [ $? -ne 0 ]; then
 		echo "Adding reordering failed on enp3s0f1"
 		exit 1
@@ -46,26 +46,24 @@ activate_delay () {
 deactivate_netem() {
 	sudo tc qdisc del dev enp3s0f0 root
 	if [ $? -ne 0 ]; then
-		echo "Deactivating netem failed on enp0s10"
-		exit 1
+		echo "Deactivating netem exited with non zero exit code for enp3s0f0"
 	fi
 	sudo tc qdisc del dev enp3s0f1 root
 	if [ $? -ne 0 ]; then
-		echo "Deactivating netem failed on enp0s10"
-		exit 1
+		echo "Deactivating netem exited with non zero exit code for enp0s10"
 	fi
 	echo "Deactivated netem on all interfaces"
 }
 
 
 go build -o client main.go
-modprobe sch_netem
-
 if [ $? -ne 0 ]; then
 	echo "Build failed, exiting"
 	exit 1
 fi
 ./client -addr=10.0.4.4:4433
+wait
+deactivate_netem
 wait
 activate_delay
 wait

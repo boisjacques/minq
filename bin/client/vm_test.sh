@@ -1,23 +1,23 @@
 #!/bin/bash
 
 activate_loss () {
-	tc qdisc change dev enp0s3 root netem loss 5% 25%
+	tc qdisc add dev enp0s3 root netem loss 5% 25%
 	if [ $? -ne 0 ]; then
 		echo "Adding loss failed on enp0s3"
 		exit 1
 	fi
-	tc qdisc change dev enp0s8 root netem loss 2% 25%
+	tc qdisc add dev enp0s8 root netem loss 2% 25%
 	if [ $? -ne 0 ]; then
 		echo "Adding loss failed on enp0s8"
 		exit 1
 	fi
-	tc qdisc change dev enp0s9 root netem loss 1% 25%
+	tc qdisc add dev enp0s9 root netem loss 1% 25%
 	if [ $? -ne 0 ]; then
 		echo "Adding loss failed on enp0s9"
 		exit 1
 	fi
 
-	tc qdisc change dev enp0s10 root netem loss 7% 25%
+	tc qdisc add dev enp0s10 root netem loss 7% 25%
 	if [ $? -ne 0 ]; then
 		echo "Adding loss failed on enp0s10"
 		exit 1
@@ -27,22 +27,22 @@ activate_loss () {
 }
 
 activate_reordering () {
-	tc qdisc change dev enp0s3 root netem gap 5 delay 10ms
+	tc qdisc add dev enp0s3 root netem gap 5 delay 10ms
 	if [ $? -ne 0 ]; then
 		echo "Adding reordering failed on enp0s3"
 		exit 1
 	fi
-	tc qdisc change dev enp0s8 root netem gap 2 delay 45ms
+	tc qdisc add dev enp0s8 root netem gap 2 delay 45ms
 	if [ $? -ne 0 ]; then
 		echo "Adding reordering failed on enp0s8"
 		exit 1
 	fi
-	tc qdisc change dev enp0s9 root netem gap 7 delay 15ms
+	tc qdisc add dev enp0s9 root netem gap 7 delay 15ms
 	if [ $? -ne 0 ]; then
 		echo "Adding reordering failed on enp0s9"
 		exit 1
 	fi
-	tc qdisc change dev enp0s10 root netem gap 9 delay 3ms
+	tc qdisc add dev enp0s10 root netem gap 9 delay 3ms
 	if [ $? -ne 0 ]; then
 		echo "Adding reordering failed on enp0s10"
 		exit 1
