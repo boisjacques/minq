@@ -61,11 +61,13 @@ if [ $? -ne 0 ]; then
 	echo "Build failed, exiting"
 	exit 1
 fi
+
 ./bootstrap.sh
 ./client -addr=10.0.1.10:4433
 wait
 deactivate_netem
 wait
+
 activate_delay
 wait
 cat alice.txt | ./client -addr=10.0.1.10:4433 > delay.result
@@ -73,6 +75,23 @@ wait
 deactivate_netem
 ./flipper delay.result
 wait
+
+activate_loss
+cat alice.txt | ./client -addr=10.0.1.10:4433 > loss.result
+wait
+deactivate_netem
+./flipper loss.result
+wait
+
+activate_reordering
+wait
+cat alice.txt | ./client -addr=10.0.1.10:4433 > reordering.result
+wait
+deactivate_netem
+./flipper reordering.result
+wait
+
+# Result Delay
 diff alice.txt flipped-delay.result > /dev/null
 wait
 if [ $? -eq 0 ]; then
@@ -82,11 +101,8 @@ elif [ $? -eq 1 ]; then
 else
 	echo "Diff exited with error code"
 fi
-activate_loss
-cat alice.txt | ./client -addr=10.0.1.10:4433 > loss.result
-deactivate_netem
-./flipper loss.result
-wait
+
+# Result Loss
 diff alice.txt flipped-loss.result > /dev/null
 wait
 if [ $? -eq 0 ]; then
@@ -97,18 +113,12 @@ else
         echo "Diff exited with error code"
 fi
 
-activate_reordering
-wait
-cat alice.txt | ./client -addr=10.0.1.10:4433 > reordering.result
-wait
-deactivate_netem
-./flipper reordering.result
-wait
+# Result Reordering
 diff alice.txt flipped-reordering.result > /dev/null
 if [ $? -eq 0 ]; then
         echo "Delay test passed without errors"
 elif [ $? -eq 1 ]; then
-        echo "Delay caused rordering"
+        echo "Reordering test failed"
 else
         echo "Diff exited with error code"
 fi
