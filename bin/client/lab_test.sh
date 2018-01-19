@@ -61,6 +61,7 @@ if [ $? -ne 0 ]; then
 	echo "Build failed, exiting"
 	exit 1
 fi
+./bootstrap.sh
 ./client -addr=10.0.1.10:4433
 wait
 deactivate_netem
@@ -76,7 +77,7 @@ diff alice.txt flipped-delay.result > /dev/null
 wait
 if [ $? -eq 0 ]; then
 	echo "Delay test passed without errors"
-elif [$? -eq 1 ]; then
+elif [ $? -eq 1 ]; then
 	echo "Delay test failed"
 else
 	echo "Diff exited with error code"
@@ -90,7 +91,7 @@ diff alice.txt flipped-loss.result > /dev/null
 wait
 if [ $? -eq 0 ]; then
         echo "Loss test passed without errors"
-elif [$? -eq 1 ]; then
+elif [ $? -eq 1 ]; then
         echo "Loss test failed"
 else
         echo "Diff exited with error code"
@@ -106,7 +107,7 @@ wait
 diff alice.txt flipped-reordering.result > /dev/null
 if [ $? -eq 0 ]; then
         echo "Delay test passed without errors"
-elif [$? -eq 1 ]; then
+elif [ $? -eq 1 ]; then
         echo "Delay caused rordering"
 else
         echo "Diff exited with error code"
