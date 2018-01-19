@@ -100,15 +100,14 @@ func (s *Scheduler) sendToPath(path uint32, p []byte) error {
 func (s *Scheduler) newPath(local, remote *net.UDPAddr) {
 	usock, err := s.addressHelper.openSocket(local)
 	if err != nil {
-		s.connection.log(logTypeMultipath, "Error while creating path local IP: %x remote IP %v", *local, *remote)
+		s.connection.log(logTypeMultipath, "Error while creating path local IP: %x remote IP %v", local, *remote)
 		s.connection.log(logTypeMultipath, "Following error occurred", err)
 		return
 	}
 	transport := NewUdpTransport(usock, remote)
 	checksum := adler32.Checksum(xor([]byte(local.String()), []byte(remote.String())))
 	p := NewPath(s.connection, transport, checksum, local, remote)
-	s.connection.log(logTypeMultipath, "Path successfully created. Endpoints: local %v remote %x", local, remote)
-	//p.updateMetric(s.referenceRTT)
+	s.connection.log(logTypeMultipath, "Path successfully created. Endpoints: local %v remote %x", local, *remote)
 	s.paths[p.pathID] = *p
 	s.pathIds = append(s.pathIds, p.pathID)
 }
