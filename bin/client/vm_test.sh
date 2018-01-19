@@ -11,20 +11,18 @@ activate_loss () {
 		echo "Adding loss failed on enp0s8"
 		exit 1
 	fi
-	if [ $# -gt 2]; then
-		tc qdisc change dev enp0s9 root netem loss 1% 25%
-		if [ $? -ne 0 ]; then
-			echo "Adding loss failed on enp0s9"
-			exit 1
-		fi
+	tc qdisc change dev enp0s9 root netem loss 1% 25%
+	if [ $? -ne 0 ]; then
+		echo "Adding loss failed on enp0s9"
+		exit 1
 	fi
-	if [ $# -gt 3]; then
-		tc qdisc change dev enp0s10 root netem loss 7% 25%
-		if [ $? -ne 0 ]; then
-			echo "Adding loss failed on enp0s10"
-			exit 1
-		fi
+
+	tc qdisc change dev enp0s10 root netem loss 7% 25%
+	if [ $? -ne 0 ]; then
+		echo "Adding loss failed on enp0s10"
+		exit 1
 	fi
+
 	echo "Added loss on all interfaces"
 }
 
@@ -39,20 +37,17 @@ activate_reordering () {
 		echo "Adding reordering failed on enp0s8"
 		exit 1
 	fi
-	if [ $# -gt 2]; then
-		tc qdisc change dev enp0s9 root netem gap 7 delay 15ms
-		if [ $? -ne 0 ]; then
-			echo "Adding reordering failed on enp0s9"
-			exit 1
-		fi
+	tc qdisc change dev enp0s9 root netem gap 7 delay 15ms
+	if [ $? -ne 0 ]; then
+		echo "Adding reordering failed on enp0s9"
+		exit 1
 	fi
-	if [ $# -gt 3]; then
-		tc qdisc change dev enp0s10 root netem gap 9 delay 3ms
-		if [ $? -ne 0 ]; then
-			echo "Adding reordering failed on enp0s10"
-			exit 1
-		fi
+	tc qdisc change dev enp0s10 root netem gap 9 delay 3ms
+	if [ $? -ne 0 ]; then
+		echo "Adding reordering failed on enp0s10"
+		exit 1
 	fi
+
 	echo "Added reordering on all interfaces"
 
 }
@@ -68,19 +63,15 @@ activate_delay () {
 		echo "Adding delay failed on enp0s8"
 		exit 1
 	fi
-	if [ $# -gt 2]; then
-		tc qdisc add dev enp0s9 root netem delay 175ms 10ms 25%
-		if [ $? -ne 0 ]; then
-			echo "Adding delay failed on enp0s9"
-			exit 1
-		fi
+	tc qdisc add dev enp0s9 root netem delay 175ms 10ms 25%
+	if [ $? -ne 0 ]; then
+		echo "Adding delay failed on enp0s9"
+		exit 1
 	fi
-	if [ $# -gt 3]; then
-		tc qdisc add dev enp0s10 root netem delay 200ms 10ms 25%
-		if [ $? -ne 0 ]; then
-			echo "Adding delay failed on enp0s10"
-			exit 1
-		fi
+	tc qdisc add dev enp0s10 root netem delay 200ms 10ms 25%
+	if [ $? -ne 0 ]; then
+		echo "Adding delay failed on enp0s10"
+		exit 1
 	fi
 	echo "Activated delay on all interfaces"
 }
@@ -96,19 +87,15 @@ deactivate_netem() {
 		echo "Deactivating netem failed on enp0s10"
 		exit 1
 	fi
-	if [ $# -gt 2]; then
-		tc qdisc del dev enp0s9 root
-		if [ $? -ne 0 ]; then
-			echo "Deactivating netem failed on enp0s10"
-			exit 1
-		fi
+	tc qdisc del dev enp0s9 root
+	if [ $? -ne 0 ]; then
+		echo "Deactivating netem failed on enp0s10"
+		exit 1
 	fi
-	if [ $# -gt 3]; then
-		tc qdisc del dev enp0s10 root
-		if [ $? -ne 0 ]; then
-			echo "Deactivating netem failed on enp0s10"
-			exit 1
-		fi
+	tc qdisc del dev enp0s10 root
+	if [ $? -ne 0 ]; then
+		echo "Deactivating netem failed on enp0s10"
+		exit 1
 	fi
 }
 
@@ -119,6 +106,7 @@ fi
 
 go build -o client main.go
 modprobe sch_netem
+deactivate_netem
 
 if [ $? -ne 0 ]; then
 	echo "Build failed, exiting"
