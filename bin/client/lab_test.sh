@@ -1,12 +1,12 @@
 #!/bin/bash
 
 activate_loss () {
-	tc qdisc change dev enp3s0f0 root netem loss 5% 25%
+	sudo tc qdisc change dev enp3s0f0 root netem loss 5% 25%
 	if [ $? -ne 0 ]; then
 		echo "Adding loss failed on enp3s0f0"
 		exit 1
 	fi
-	tc qdisc change dev enp3s0f1 root netem loss 2% 25%
+	sudo tc qdisc change dev enp3s0f1 root netem loss 2% 25%
 	if [ $? -ne 0 ]; then
 		echo "Adding loss failed on enp3s0f1"
 		exit 1
@@ -15,12 +15,12 @@ activate_loss () {
 }
 
 activate_reordering () {
-	tc qdisc change dev enp3s0f0 root netem gap 5 delay 10ms
+	sudo tc qdisc change dev enp3s0f0 root netem gap 5 delay 10ms
 	if [ $? -ne 0 ]; then
 		echo "Adding reordering failed on enp3s0f0"
 		exit 1
 	fi
-	tc qdisc change dev enp3s0f1 root netem gap 2 delay 45ms
+	sudo tc qdisc change dev enp3s0f1 root netem gap 2 delay 45ms
 	if [ $? -ne 0 ]; then
 		echo "Adding reordering failed on enp3s0f1"
 		exit 1
@@ -30,12 +30,12 @@ activate_reordering () {
 }
 
 activate_delay () {
-	tc qdisc add dev enp3s0f0 root netem delay 100ms 10ms 25%
+	sudo tc qdisc add dev enp3s0f0 root netem delay 100ms 10ms 25%
 	if [ $? -ne 0 ]; then
 		echo "Adding delay failed on enp3s0f0"
 		exit 1
 	fi
-	tc qdisc add dev enp3s0f1 root netem delay 150ms 10ms 25%
+	sudo tc qdisc add dev enp3s0f1 root netem delay 150ms 10ms 25%
 	if [ $? -ne 0 ]; then
 		echo "Adding delay failed on enp3s0f1"
 		exit 1
@@ -44,12 +44,12 @@ activate_delay () {
 }
 
 deactivate_netem() {
-	tc qdisc del dev enp3s0f0 root
+	sudo tc qdisc del dev enp3s0f0 root
 	if [ $? -ne 0 ]; then
 		echo "Deactivating netem failed on enp0s10"
 		exit 1
 	fi
-	tc qdisc del dev enp3s0f1 root
+	sudo tc qdisc del dev enp3s0f1 root
 	if [ $? -ne 0 ]; then
 		echo "Deactivating netem failed on enp0s10"
 		exit 1
@@ -57,10 +57,6 @@ deactivate_netem() {
 	echo "Deactivated netem on all interfaces"
 }
 
-if [ "$(whoami)" != "root" ]; then
-	echo "Sorry, you are not root."
-	exit 1
-fi
 
 go build -o client main.go
 modprobe sch_netem
