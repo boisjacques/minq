@@ -27,22 +27,22 @@ activate_loss () {
 }
 
 activate_reordering () {
-	tc qdisc add dev enp0s3 root netem gap 5 delay 10ms
+	tc qdisc add dev enp0s3 root netem delay 100ms 75 ms
 	if [ $? -ne 0 ]; then
 		echo "Adding reordering failed on enp0s3"
 		exit 1
 	fi
-	tc qdisc add dev enp0s8 root netem gap 2 delay 45ms
+	tc qdisc add dev enp0s8 root netem delay 110ms 35 ms
 	if [ $? -ne 0 ]; then
 		echo "Adding reordering failed on enp0s8"
 		exit 1
 	fi
-	tc qdisc add dev enp0s9 root netem gap 7 delay 15ms
+	tc qdisc add dev enp0s9 root netem delay 140ms 85 ms
 	if [ $? -ne 0 ]; then
 		echo "Adding reordering failed on enp0s9"
 		exit 1
 	fi
-	tc qdisc add dev enp0s10 root netem gap 9 delay 3ms
+	tc qdisc add dev enp0s10 root netem delay 50ms 135 ms
 	if [ $? -ne 0 ]; then
 		echo "Adding reordering failed on enp0s10"
 		exit 1
@@ -79,15 +79,15 @@ activate_delay () {
 deactivate_netem() {
 	tc qdisc del dev enp0s3 root
 	if [ $? -ne 0 ]; then
-		echo "Deactivating netem exited with non zero exit code for enp0s10"
+		echo "Deactivating netem exited with non zero exit code for enp0s3"
 	fi
 	tc qdisc del dev enp0s8 root
 	if [ $? -ne 0 ]; then
-		echo "Deactivating netem exited with non zero exit code for enp0s10"
+		echo "Deactivating netem exited with non zero exit code for enp0s8"
 	fi
 	tc qdisc del dev enp0s9 root
 	if [ $? -ne 0 ]; then
-		echo "Deactivating netem exited with non zero exit code for enp0s10"
+		echo "Deactivating netem exited with non zero exit code for enp0s9"
 	fi
 	tc qdisc del dev enp0s10 root
 	if [ $? -ne 0 ]; then
@@ -138,7 +138,6 @@ deactivate_netem
 wait
 
 diff alice.txt flipped-delay.result > /dev/null
-wait
 if [ $? -eq 0 ]; then
 	echo "Delay test passed without errors"
 elif [$? -eq 1 ]; then
@@ -148,7 +147,6 @@ else
 fi
 
 diff alice.txt flipped-loss.result > /dev/null
-wait
 if [ $? -eq 0 ]; then
         echo "Loss test passed without errors"
 elif [$? -eq 1 ]; then
