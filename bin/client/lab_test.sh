@@ -15,12 +15,12 @@ activate_loss () {
 }
 
 activate_reordering () {
-	sudo tc qdisc add dev enp3s0f0 root netem gap 5 delay 10ms
+	sudo tc qdisc add dev enp3s0f0 root netem delay 100ms 75ms
 	if [ $? -ne 0 ]; then
 		echo "Adding reordering failed on enp3s0f0"
 		exit 1
 	fi
-	sudo tc qdisc add dev enp3s0f1 root netem gap 2 delay 45ms
+	sudo tc qdisc add dev enp3s0f1 root netem delay 45ms 100ms
 	if [ $? -ne 0 ]; then
 		echo "Adding reordering failed on enp3s0f1"
 		exit 1
@@ -61,13 +61,13 @@ if [ $? -ne 0 ]; then
 	echo "Build failed, exiting"
 	exit 1
 fi
-./client -addr=10.0.4.4:4433
+./client -addr=10.0.1.10:4433
 wait
 deactivate_netem
 wait
 activate_delay
 wait
-cat alice.txt | ./client -addr=10.0.4.4:4433 > delay.result
+cat alice.txt | ./client -addr=10.0.1.10:4433 > delay.result
 wait
 deactivate_netem
 ./flipper delay.result
@@ -82,7 +82,7 @@ else
 	echo "Diff exited with error code"
 fi
 activate_loss
-cat alice.txt | ./client -addr=10.0.4.4:4433 > loss.result
+cat alice.txt | ./client -addr=10.0.1.10:4433 > loss.result
 deactivate_netem
 ./flipper loss.result
 wait
@@ -98,7 +98,7 @@ fi
 
 activate_reordering
 wait
-cat alice.txt | ./client -addr=10.0.4.4:4433 > reordering.result
+cat alice.txt | ./client -addr=10.0.1.10:4433 > reordering.result
 wait
 deactivate_netem
 ./flipper reordering.result
