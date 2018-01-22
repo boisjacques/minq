@@ -129,13 +129,13 @@ deactivate_netem
 ./flipper loss.result
 wait
 
-activate_reordering
-wait
-cat alice.txt | ./client -addr=10.0.4.4:4433 > reordering.result
-wait
-deactivate_netem
-./flipper reordering.result
-wait
+# activate_reordering
+# wait
+# cat alice.txt | ./client -addr=10.0.4.4:4433 > reordering.result
+# wait
+# deactivate_netem
+# ./flipper reordering.result
+# wait
 
 diff alice.txt flipped-delay.result > /dev/null
 if [ $? -eq 0 ]; then
@@ -155,11 +155,11 @@ else
         echo "Diff exited with error code"
 fi
 
-diff alice.txt flipped-reordering.result > /dev/null
-if [ $? -eq 0 ]; then
-        echo "Delay test passed without errors"
-elif [$? -eq 1 ]; then
-        echo "Delay caused rordering"
-else
-        echo "Diff exited with error code"
-fi
+# diff alice.txt flipped-reordering.result > /dev/null
+# if [ $? -eq 0 ]; then
+#         echo "Delay test passed without errors"
+# elif [$? -eq 1 ]; then
+#         echo "Delay caused rordering"
+# else
+#         echo "Diff exited with error code"
+# fi
