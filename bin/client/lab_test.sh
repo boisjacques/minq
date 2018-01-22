@@ -66,7 +66,9 @@ fi
 if [ -f clientLog ]; then
     rm clientLog
 fi
-
+if [ -f clientlog ]; then
+    rm clientLog
+fi
 
 go build -o client main.go
 if [ $? -ne 0 ]; then

@@ -120,6 +120,10 @@ fi
 if [ -f clientLog ]; then
     rm clientLog
 fi
+if [ -f clientlog ]; then
+    rm clientLog
+fi
+
 
 export "MINQ_LOG"=mp,mutex
 
