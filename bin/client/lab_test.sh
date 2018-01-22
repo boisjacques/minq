@@ -55,6 +55,13 @@ deactivate_netem() {
 	echo "Deactivated netem on all interfaces"
 }
 
+if [ -f flipped-delay.result ]; then
+    rm flipped-delay.result
+fi
+
+if [ -f flipped-loss.result ]; then
+    rm flipped-loss.result
+fi
 
 go build -o client main.go
 if [ $? -ne 0 ]; then
@@ -110,6 +117,9 @@ elif [ $? -eq 1 ]; then
 else
         echo "Diff exited with error code"
 fi
+
+rm delay.result
+rm loss.result
 
 # Result Reordering
 # diff alice.txt flipped-reordering.result > /dev/null

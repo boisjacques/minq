@@ -109,6 +109,14 @@ fi
 modprobe sch_netem
 deactivate_netem
 
+if [ -f flipped-delay.result ]; then
+    rm flipped-delay.result
+fi
+
+if [ -f flipped-loss.result ]; then
+    rm flipped-loss.result
+fi
+
 ./client -addr=10.0.4.4:4433
 wait
 
@@ -163,3 +171,6 @@ fi
 # else
 #         echo "Diff exited with error code"
 # fi
+
+rm delay.result
+rm loss.result
