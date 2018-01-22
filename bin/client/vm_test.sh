@@ -117,6 +117,12 @@ if [ -f flipped-loss.result ]; then
     rm flipped-loss.result
 fi
 
+if [ -f clientLog ]; then
+    rm clientLog
+fi
+
+export "MINQ_LOG"=mp,mutex
+
 ./client -addr=10.0.4.4:4433
 wait
 
@@ -174,3 +180,4 @@ fi
 
 rm delay.result
 rm loss.result
+rm client

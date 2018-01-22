@@ -63,6 +63,11 @@ if [ -f flipped-loss.result ]; then
     rm flipped-loss.result
 fi
 
+if [ -f clientLog ]; then
+    rm clientLog
+fi
+
+
 go build -o client main.go
 if [ $? -ne 0 ]; then
 	echo "Build failed, exiting"
@@ -120,6 +125,7 @@ fi
 
 rm delay.result
 rm loss.result
+rm client
 
 # Result Reordering
 # diff alice.txt flipped-reordering.result > /dev/null
