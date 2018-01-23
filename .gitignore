@@ -8,3 +8,7 @@ serverlog
 bin/server/server
 
 bin/client/trace\.out
+
+*.bin
+
+*.out

@@ -133,10 +133,6 @@ func (s *Scheduler) addRemoteAddress(remote *net.UDPAddr) {
 			s.newPath(local, remote)
 		}
 	}
-	remoteAdded := true
-	if remoteAdded {
-
-	}
 }
 
 func (s *Scheduler) removeAddress(address string) {

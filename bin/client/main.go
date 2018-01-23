@@ -9,11 +9,13 @@ import (
 	"os"
 	"runtime/pprof"
 	"time"
+	"io/ioutil"
 )
 
 var addr string
 var serverName string
 var doHttp string
+var doFile string
 var httpCount int
 var heartbeat int
 var cpuProfile string
@@ -81,6 +83,7 @@ func main() {
 	flag.StringVar(&addr, "addr", "localhost:4433", "[host:port]")
 	flag.StringVar(&serverName, "server-name", "", "SNI")
 	flag.StringVar(&doHttp, "http", "", "Do HTTP/0.9 with provided URL")
+	flag.StringVar(&doFile, "file", "", "Pass Filename")
 	flag.IntVar(&httpCount, "httpCount", 1, "Number of parallel HTTP requests to start")
 	flag.IntVar(&heartbeat, "heartbeat", 0, "heartbeat frequency [ms]")
 	flag.StringVar(&cpuProfile, "cpuprofile", "", "write cpu profile to file")
@@ -203,7 +206,14 @@ func main() {
 		}()
 	}
 
-	if doHttp == "" {
+
+	if 	doFile != "" {
+		b, err := ioutil.ReadFile(doFile)
+		if err != nil {
+			fmt.Print(err)
+		}
+		stdin <- b
+	} else if doHttp == "" {
 		// Read from stdin.
 		go func() {
 			for {
@@ -217,6 +227,7 @@ func main() {
 				stdin <- b
 			}
 		}()
+
 	} else {
 		req := "GET " + doHttp + "\r\n"
 		for _, str := range streams {
