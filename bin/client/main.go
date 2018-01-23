@@ -52,7 +52,7 @@ func (h *connHandler) StreamReadable(s *minq.Stream) {
 		b = b[:n]
 		h.bytesRead += n
 		os.Stdout.Write(b)
-		os.Stderr.Write([]byte(fmt.Sprintf("Total bytes read = %d\n", h.bytesRead)))
+		//os.Stderr.Write([]byte(fmt.Sprintf("Total bytes read = %d\n", h.bytesRead)))
 	}
 }
 

@@ -90,8 +90,8 @@ func (h *feedthroughConnHandler) StreamReadable(s *minq.Stream) {
 		}
 		b = b[:n]
 		h.bytesRead += n
-		os.Stdout.Write(b)
-		log.Println("Total bytes read = %d", h.bytesRead)
+		//os.Stdout.Write(b)
+		//log.Println("Total bytes read = %d", h.bytesRead)
 
 		if echo {
 			// Flip the case so we can distinguish echo
