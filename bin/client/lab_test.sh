@@ -55,6 +55,27 @@ deactivate_netem() {
 	echo "Deactivated netem on all interfaces"
 }
 
+check_results() {
+	sha256sum -c testfile2mb.sha
+	if [ $? -ne 0]; then
+		echo $1 " test failed with 2MB file" >> results
+	else
+		echo $1 " test passed with 2MB file" >> results
+	fi
+	sha256sum -c testfile10mb.sha
+	if [ $? -ne 0]; then
+		echo $1 " test failed with 10MB file" >> results
+	else
+		echo $1 " test passed with 10MB file" >> results
+	fi
+	sha256sum -c testfile100mb.sha
+	if [ $? -ne 0]; then
+		echo $1 " test failed with 100MB file" >> results
+	else
+		echo $1 " test passed with 100MB file" >> results
+	fi
+}
+
 if [ -f flipped-delay.result ]; then
     rm flipped-delay.result
 fi
@@ -70,6 +91,7 @@ if [ -f clientlog ]; then
     rm clientLog
 fi
 
+
 go build -o client main.go
 if [ $? -ne 0 ]; then
 	echo "Build failed, exiting"
@@ -77,64 +99,49 @@ if [ $? -ne 0 ]; then
 fi
 
 ./bootstrap.sh
+deactivate_netem
+wait
 ./client -addr=10.0.1.10:4433
 wait
-deactivate_netem
-wait
 
+echo "Running test without wire errors"
+cat testfile2mb | ./client -addr=10.0.1.10:4433 > testfile2mb.result
+wait
+cat testfile10mb | ./client -addr=10.0.1.10:4433 > testfile10mb.result
+wait
+cat testfile100mb | ./client -addr=10.0.1.10:4433 > testfile100mb.result
+wait
+check_results "Plain"
+
+echo "Running test with delay"
 activate_delay
 wait
-cat alice.txt | ./client -addr=10.0.1.10:4433 > delay.result
+cat testfile2mb | ./client -addr=10.0.1.10:4433 > testfile2mb.result
 wait
+cat testfile10mb | ./client -addr=10.0.1.10:4433 > testfile10mb.result
+wait
+cat testfile100mb | ./client -addr=10.0.1.10:4433 > testfile100mb.result
+wait
+check_results "Delay"
 deactivate_netem
-./flipper delay.result
 wait
 
+echo "Running test with loss"
 activate_loss
-cat alice.txt | ./client -addr=10.0.1.10:4433 > loss.result
+cat testfile2mb | ./client -addr=10.0.1.10:4433 > testfile2mb.result
 wait
+cat testfile10mb | ./client -addr=10.0.1.10:4433 > testfile10mb.result
+wait
+cat testfile100mb | ./client -addr=10.0.1.10:4433 > testfile100mb.result
+wait
+check_results "Loss"
 deactivate_netem
-./flipper loss.result
 wait
 
-# activate_reordering
-# wait
-# cat alice.txt | ./client -addr=10.0.1.10:4433 > reordering.result
-# wait
-# deactivate_netem
-# ./flipper reordering.result
-# wait
+cat results > `date`_results
 
-# Result Delay
-diff alice.txt flipped-delay.result > /dev/null
-if [ $? -eq 0 ]; then
-	echo "Delay test passed without errors"
-elif [ $? -eq 1 ]; then
-	echo "Delay test failed"
-else
-	echo "Diff exited with error code"
-fi
 
-# Result Loss
-diff alice.txt flipped-loss.result > /dev/null
-if [ $? -eq 0 ]; then
-        echo "Loss test passed without errors"
-elif [ $? -eq 1 ]; then
-        echo "Loss test failed"
-else
-        echo "Diff exited with error code"
-fi
-
-rm delay.result
-rm loss.result
+rm results
+rm *.result
 rm client
 
-# Result Reordering
-# diff alice.txt flipped-reordering.result > /dev/null
-# if [ $? -eq 0 ]; then
-#         echo "Delay test passed without errors"
-# elif [ $? -eq 1 ]; then
-#         echo "Reordering test failed"
-# else
-#         echo "Diff exited with error code"
-# fi
