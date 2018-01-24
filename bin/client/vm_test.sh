@@ -97,19 +97,19 @@ deactivate_netem() {
 
 check_results() {
 	sha256sum -c testfile2mb.sha
-	if [ $? -ne 0]; then
+	if [ $? -ne 0 ]; then
 		echo $1 " test failed with 2MB file" >> results
 	else
 		echo $1 " test passed with 2MB file" >> results
 	fi
 	sha256sum -c testfile10mb.sha
-	if [ $? -ne 0]; then
+	if [ $? -ne 0 ]; then
 		echo $1 " test failed with 10MB file" >> results
 	else
 		echo $1 " test passed with 10MB file" >> results
 	fi
 	sha256sum -c testfile100mb.sha
-	if [ $? -ne 0]; then
+	if [ $? -ne 0 ]; then
 		echo $1 " test failed with 100MB file" >> results
 	else
 		echo $1 " test passed with 100MB file" >> results
