@@ -105,17 +105,14 @@ run_tests() {
 	FINISH100MB=`date +%s%N | cut -b1-13`
 	wait
 	DURATION2MB=$(( FINISH2MB - START2MB ))
+	echo $DURATION2MB
 	DURATION10MB=$(( FINISH10MB - START10MB ))
+	echo $DURATION10MB
 	DURATION100MB=$(( FINISH100MB - START100MB ))
-	DURATION2MB=$(( DURATION2MB / 1000 ))
-	DURATION10MB=$(( DURATION10MB / 1000 ))
-	DURATION100MB=$(( DURATION100MB / 1000 ))
-	DURATION2MB=$(( DURATION2MB / 2000 ))
-	DURATION10MB=$(( DURATION10MB / 10000 ))
-	DURATION100MB=$(( DURATION100MB / 100000 ))
-	echo "2MB transfered with" $DURATION2MB "KB/s" >> bandwidth
-	echo "10MB transfered with" $DURATION10MB "KB/s" >> bandwidth
-	echo "100MB transfered with" $DURATION100MB "KB/s" >> bandwidth 
+	echo $DURATION100MB
+	echo "2MB transfered with" $(( DURATION2MB / 2000000 )) "KB/s" >> bandwidth
+	echo "10MB transfered with" $(( DURATION10MB / 10000000 )) "KB/s" >> bandwidth
+	echo "100MB transfered with" $(( DURATION100MB / 100000000 )) "KB/s" >> bandwidth 
 }
 
 
