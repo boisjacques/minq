@@ -123,6 +123,8 @@ done
 
 cat results > `date '+%Y_%m_%d__%H_%M_%S'`_plain_results
 cat bandwidth >> `date '+%Y_%m_%d__%H_%M_%S'`_plain_results
+rm results
+rm bandwidth
 
 counter=0
 while [ $counter -lt 10 ]; do
@@ -136,6 +138,8 @@ done
 
 cat results > `date '+%Y_%m_%d__%H_%M_%S'`_loss_results
 cat bandwidth >> `date '+%Y_%m_%d__%H_%M_%S'`_loss_results
+rm results
+rm bandwidth
 
 counter=0
 while [ $counter -lt 10 ]; do
@@ -150,6 +154,8 @@ done
 
 cat results > `date '+%Y_%m_%d__%H_%M_%S'`_delay_results
 cat bandwidth >> `date '+%Y_%m_%d__%H_%M_%S'`_delay_results
+rm results
+rm bandwidth
 
 rm bandwidth
 rm results
