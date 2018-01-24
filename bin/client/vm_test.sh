@@ -129,22 +129,22 @@ wait
 
 
 echo "Running test without wire errors"
-cat testfile2mb | ./client -addr=10.0.1.10:4433 > testfile2mb.result
+cat testfile2mb | ./client -addr=10.0.4.4:4433 > testfile2mb.result
 wait
-cat testfile10mb | ./client -addr=10.0.1.10:4433 > testfile10mb.result
+cat testfile10mb | ./client -addr=10.0.4.4:4433 > testfile10mb.result
 wait
-cat testfile100mb | ./client -addr=10.0.1.10:4433 > testfile100mb.result
+cat testfile100mb | ./client -addr=10.0.4.4:4433 > testfile100mb.result
 wait
 check_results "Plain"
 
 echo "Running test with delay"
 activate_delay
 wait
-cat testfile2mb | ./client -addr=10.0.1.10:4433 > testfile2mb.result
+cat testfile2mb | ./client -addr=10.0.4.4:4433 > testfile2mb.result
 wait
-cat testfile10mb | ./client -addr=10.0.1.10:4433 > testfile10mb.result
+cat testfile10mb | ./client -addr=10.0.4.4:4433 > testfile10mb.result
 wait
-cat testfile100mb | ./client -addr=10.0.1.10:4433 > testfile100mb.result
+cat testfile100mb | ./client -addr=10.0.4.4:4433 > testfile100mb.result
 wait
 check_results "Delay"
 deactivate_netem
@@ -152,11 +152,11 @@ wait
 
 echo "Running test with loss"
 activate_loss
-cat testfile2mb | ./client -addr=10.0.1.10:4433 > testfile2mb.result
+cat testfile2mb | ./client -addr=10.0.4.4:4433 > testfile2mb.result
 wait
-cat testfile10mb | ./client -addr=10.0.1.10:4433 > testfile10mb.result
+cat testfile10mb | ./client -addr=10.0.4.4:4433 > testfile10mb.result
 wait
-cat testfile100mb | ./client -addr=10.0.1.10:4433 > testfile100mb.result
+cat testfile100mb | ./client -addr=10.0.4.4:4433 > testfile100mb.result
 wait
 check_results "Loss"
 deactivate_netem
