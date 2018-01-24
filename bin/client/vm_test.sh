@@ -127,40 +127,45 @@ export "MINQ_LOG"=mp,mutex
 ./client -addr=10.0.4.4:4433
 wait
 
+if [ $# -eq 0 ]; then
+	echo "Running test without wire errors"
+	cat testfile2mb | ./client -addr=10.0.4.4:4433 > testfile2mb.result
+	wait
+	cat testfile10mb | ./client -addr=10.0.4.4:4433 > testfile10mb.result
+	wait
+	cat testfile100mb | ./client -addr=10.0.4.4:4433 > testfile100mb.result
+	wait
+	check_results "Plain"
+fi
 
-echo "Running test without wire errors"
-cat testfile2mb | ./client -addr=10.0.4.4:4433 > testfile2mb.result
-wait
-cat testfile10mb | ./client -addr=10.0.4.4:4433 > testfile10mb.result
-wait
-cat testfile100mb | ./client -addr=10.0.4.4:4433 > testfile100mb.result
-wait
-check_results "Plain"
+if [ $1 -eq "-d" ]; then
+	echo "Running test with delay"
+	activate_delay
+	wait
+	cat testfile2mb | ./client -addr=10.0.4.4:4433 > testfile2mb.result
+	wait
+	cat testfile10mb | ./client -addr=10.0.4.4:4433 > testfile10mb.result
+	wait
+	cat testfile100mb | ./client -addr=10.0.4.4:4433 > testfile100mb.result
+	wait
+	check_results "Delay"
+	deactivate_netem
+	wait
+fi
 
-echo "Running test with delay"
-activate_delay
-wait
-cat testfile2mb | ./client -addr=10.0.4.4:4433 > testfile2mb.result
-wait
-cat testfile10mb | ./client -addr=10.0.4.4:4433 > testfile10mb.result
-wait
-cat testfile100mb | ./client -addr=10.0.4.4:4433 > testfile100mb.result
-wait
-check_results "Delay"
-deactivate_netem
-wait
-
-echo "Running test with loss"
-activate_loss
-cat testfile2mb | ./client -addr=10.0.4.4:4433 > testfile2mb.result
-wait
-cat testfile10mb | ./client -addr=10.0.4.4:4433 > testfile10mb.result
-wait
-cat testfile100mb | ./client -addr=10.0.4.4:4433 > testfile100mb.result
-wait
-check_results "Loss"
-deactivate_netem
-wait
+if [ $1 -eq "-l" ]; then
+	echo "Running test with loss"
+	activate_loss
+	cat testfile2mb | ./client -addr=10.0.4.4:4433 > testfile2mb.result
+	wait
+	cat testfile10mb | ./client -addr=10.0.4.4:4433 > testfile10mb.result
+	wait
+	cat testfile100mb | ./client -addr=10.0.4.4:4433 > testfile100mb.result
+	wait
+	check_results "Loss"
+	deactivate_netem
+	wait
+fi
 
 cat results > `date '+%Y_%m_%d__%H_%M_%S'`_results
 
