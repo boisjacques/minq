@@ -1,7 +1,7 @@
 #!/bin/bash
 
 activate_loss () {
-	tc qdisc add dev enp0s3 root netem loss 5% 25%
+	tc qdisc add dev enp0s3 root netem loss 4% 25%
 	if [ $? -ne 0 ]; then
 		echo "Adding loss failed on enp0s3"
 		exit 1
@@ -17,7 +17,7 @@ activate_loss () {
 		exit 1
 	fi
 
-	tc qdisc add dev enp0s10 root netem loss 7% 25%
+	tc qdisc add dev enp0s10 root netem loss 3% 25%
 	if [ $? -ne 0 ]; then
 		echo "Adding loss failed on enp0s10"
 		exit 1
@@ -26,48 +26,23 @@ activate_loss () {
 	echo "Added loss on all interfaces"
 }
 
-activate_reordering () {
-	tc qdisc add dev enp0s3 root netem reorder 15% 25%
-	if [ $? -ne 0 ]; then
-		echo "Adding reordering failed on enp0s3"
-		exit 1
-	fi
-	tc qdisc add dev enp0s8 root netem reorder 20% 15%
-	if [ $? -ne 0 ]; then
-		echo "Adding reordering failed on enp0s8"
-		exit 1
-	fi
-	tc qdisc add dev enp0s9 root netem reorder 35% 5%
-	if [ $? -ne 0 ]; then
-		echo "Adding reordering failed on enp0s9"
-		exit 1
-	fi
-	tc qdisc add dev enp0s10 root netem reorder 5% 45%
-	if [ $? -ne 0 ]; then
-		echo "Adding reordering failed on enp0s10"
-		exit 1
-	fi
-
-	echo "Added reordering on all interfaces"
-}
-
 activate_delay () {
-	tc qdisc add dev enp0s3 root netem delay 100ms 10ms 25%
+	tc qdisc add dev enp0s3 root netem delay 50ms 10ms 25%
 	if [ $? -ne 0 ]; then
 		echo "Adding delay failed on enp0s3"
 		exit 1
 	fi
-	tc qdisc add dev enp0s8 root netem delay 150ms 10ms 25%
+	tc qdisc add dev enp0s8 root netem delay 100ms 10ms 25%
 	if [ $? -ne 0 ]; then
 		echo "Adding delay failed on enp0s8"
 		exit 1
 	fi
-	tc qdisc add dev enp0s9 root netem delay 175ms 10ms 25%
+	tc qdisc add dev enp0s9 root netem delay 200ms 10ms 25%
 	if [ $? -ne 0 ]; then
 		echo "Adding delay failed on enp0s9"
 		exit 1
 	fi
-	tc qdisc add dev enp0s10 root netem delay 200ms 10ms 25%
+	tc qdisc add dev enp0s10 root netem delay 300ms 10ms 25%
 	if [ $? -ne 0 ]; then
 		echo "Adding delay failed on enp0s10"
 		exit 1

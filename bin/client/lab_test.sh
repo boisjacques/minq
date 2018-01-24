@@ -1,12 +1,12 @@
 #!/bin/bash
 
 activate_loss () {
-	sudo tc qdisc add dev enp3s0f0 root netem loss 5% 25%
+	sudo tc qdisc add dev enp3s0f0 root netem loss 1% 25%
 	if [ $? -ne 0 ]; then
 		echo "Adding loss failed on enp3s0f0"
 		exit 1
 	fi
-	sudo tc qdisc add dev enp3s0f1 root netem loss 2% 25%
+	sudo tc qdisc add dev enp3s0f1 root netem loss 3% 25%
 	if [ $? -ne 0 ]; then
 		echo "Adding loss failed on enp3s0f1"
 		exit 1
@@ -14,28 +14,13 @@ activate_loss () {
 	echo "Added loss on all interfaces"
 }
 
-activate_reordering () {
-	sudo tc qdisc add dev enp3s0f0 root netem delay 100ms 75ms
-	if [ $? -ne 0 ]; then
-		echo "Adding reordering failed on enp3s0f0"
-		exit 1
-	fi
-	sudo tc qdisc add dev enp3s0f1 root netem delay 45ms 100ms
-	if [ $? -ne 0 ]; then
-		echo "Adding reordering failed on enp3s0f1"
-		exit 1
-	fi
-	echo "Added reordering on all interfaces"
-
-}
-
 activate_delay () {
-	sudo tc qdisc add dev enp3s0f0 root netem delay 100ms 10ms 25%
+	sudo tc qdisc add dev enp3s0f0 root netem delay 50ms 10ms 25%
 	if [ $? -ne 0 ]; then
 		echo "Adding delay failed on enp3s0f0"
 		exit 1
 	fi
-	sudo tc qdisc add dev enp3s0f1 root netem delay 150ms 10ms 25%
+	sudo tc qdisc add dev enp3s0f1 root netem delay 300ms 10ms 25%
 	if [ $? -ne 0 ]; then
 		echo "Adding delay failed on enp3s0f1"
 		exit 1

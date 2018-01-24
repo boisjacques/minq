@@ -53,7 +53,6 @@ func (a *AddressHelper) GatherAddresses() {
 		if !strings.Contains(flags, "loopback") {
 			addrs, _ := iface.Addrs()
 			for _, addr := range addrs {
-				//TODO: Fix link local addresses, add 169.254.0.0/16
 				if !isLinkLocal(addr.String()) {
 					if strings.Contains(addr.String(), ":") {
 
