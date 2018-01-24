@@ -99,8 +99,8 @@ func (h *feedthroughConnHandler) StreamReadable(s *minq.Stream) {
 			}
 			s.Write(b)
 		}
-		os.Stdout.Write(b)
-		log.Println("Total bytes read = %d", h.bytesRead)
+		//os.Stdout.Write(b)
+		os.Stderr.Write([]byte(fmt.Sprintf("Total bytes read = %d\n", h.bytesRead)))
 	}
 }
 

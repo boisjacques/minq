@@ -110,9 +110,9 @@ run_tests() {
 	echo $DURATION10MB
 	DURATION100MB=$(( FINISH100MB - START100MB ))
 	echo $DURATION100MB
-	echo "2MB transfered with" $(( DURATION2MB / 2000000 )) "KB/s" >> bandwidth
-	echo "10MB transfered with" $(( DURATION10MB / 10000000 )) "KB/s" >> bandwidth
-	echo "100MB transfered with" $(( DURATION100MB / 100000000 )) "KB/s" >> bandwidth 
+	echo "2MB transfer took " $(( DURATION2MB / 1000 )) " seconds" >> bandwidth
+	echo "10MB transfer took " $(( DURATION10MB / 1000 )) " seconds" >> bandwidth
+	echo "100MB transfer took " $(( DURATION100MB / 1000 )) " seconds" >> bandwidth 
 }
 
 
