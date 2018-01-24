@@ -98,9 +98,7 @@ if [ $# -eq 0 ]; then
 	cat testfile100mb | ./client -addr=10.0.1.10:4433 > testfile100mb.result
 	wait
 	check_results "Plain"
-fi
-
-if [ $1 -eq "-d" ]; then
+elif [ "$1" == "-d" ]; then
 echo "Running test with delay"
 	activate_delay
 	wait
@@ -113,9 +111,7 @@ echo "Running test with delay"
 	check_results "Delay"
 	deactivate_netem
 	wait
-fi
-
-if [ $1 -eq "-l" ]; then
+elif [ "$1" == "-l" ]; then
 	echo "Running test with loss"
 	activate_loss
 	cat testfile2mb | ./client -addr=10.0.1.10:4433 > testfile2mb.result
