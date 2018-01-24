@@ -61,6 +61,33 @@ check_results() {
 	fi
 }
 
+run_tests() {
+	START2MB = date +%s%N | cut -b1-13
+	cat testfile2mb | ./client -addr=10.0.1.10:4433 > testfile2mb.result
+	FINISH2MB = date +%s%N | cut -b1-13
+	wait
+	START10MB = date +%s%N | cut -b1-13
+	cat testfile10mb | ./client -addr=10.0.1.10:4433 > testfile10mb.result
+	FINISH10MB = date +%s%N | cut -b1-13
+	wait
+	START100MB = date +%s%N | cut -b1-13
+	cat testfile100mb | ./client -addr=10.0.1.10:4433 > testfile100mb.result
+	FINISH100MB = date +%s%N | cut -b1-13
+	wait
+	DURATION2MB = FINISH2MB - START2MB
+	DURATION10MB = FINISH10MB - START10MB
+	DURATION100MB = FINISH100MB - START100MB
+	DURATION2MB = DURATION2MB / 1000
+	DURATION10MB = DURATION10MB / 1000
+	DURATION100MB = DURATION100MB / 1000
+	DURATION2MB = DURATION2MB / 2000
+	DURATION10MB = DURATION10MB / 10000
+	DURATION100MB = DURATION100MB / 100000
+	echo "2MB transfered with" DURATION2MB "KB/s" >> bandwidth
+	echo "10MB transfered with" DURATION10MB "KB/s" >> bandwidth
+	echo "100MB transfered with" DURATION100MB "KB/s" >> bandwidth 
+}
+
 if [ -f flipped-delay.result ]; then
     rm flipped-delay.result
 fi
@@ -91,43 +118,29 @@ wait
 
 if [ $# -eq 0 ]; then
 	echo "Running test without wire errors"
-	cat testfile2mb | ./client -addr=10.0.1.10:4433 > testfile2mb.result
-	wait
-	cat testfile10mb | ./client -addr=10.0.1.10:4433 > testfile10mb.result
-	wait
-	cat testfile100mb | ./client -addr=10.0.1.10:4433 > testfile100mb.result
-	wait
+	run_tests
 	check_results "Plain"
 elif [ "$1" == "-d" ]; then
 echo "Running test with delay"
 	activate_delay
 	wait
-	cat testfile2mb | ./client -addr=10.0.1.10:4433 > testfile2mb.result
-	wait
-	cat testfile10mb | ./client -addr=10.0.1.10:4433 > testfile10mb.result
-	wait
-	cat testfile100mb | ./client -addr=10.0.1.10:4433 > testfile100mb.result
-	wait
+	run_tests
 	check_results "Delay"
 	deactivate_netem
 	wait
 elif [ "$1" == "-l" ]; then
 	echo "Running test with loss"
 	activate_loss
-	cat testfile2mb | ./client -addr=10.0.1.10:4433 > testfile2mb.result
-	wait
-	cat testfile10mb | ./client -addr=10.0.1.10:4433 > testfile10mb.result
-	wait
-	cat testfile100mb | ./client -addr=10.0.1.10:4433 > testfile100mb.result
-	wait
+	run_tests
 	check_results "Loss"
 	deactivate_netem
 	wait
 fi
 
 cat results > `date '+%Y_%m_%d__%H_%M_%S'`_results
+cat bandwidth >> `date '+%Y_%m_%d__%H_%M_%S'`_results
 
-
+rm bandwidth
 rm results
 rm *.result
 rm client
