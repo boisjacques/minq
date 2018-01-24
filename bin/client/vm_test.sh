@@ -92,27 +92,27 @@ check_results() {
 }
 
 run_tests() {
-	START2MB=date +%s%N | cut -b1-13
+	START2MB=`date +%s%N | cut -b1-13`
 	cat testfile2mb | ./client -addr=10.0.4.4:4433 > testfile2mb.result
-	FINISH2MB=date +%s%N | cut -b1-13
+	FINISH2MB=`date +%s%N | cut -b1-13`
 	wait
-	START10MB=date +%s%N | cut -b1-13
+	START10MB=`date +%s%N | cut -b1-13`
 	cat testfile10mb | ./client -addr=10.0.4.4:4433 > testfile10mb.result
-	FINISH10MB=date +%s%N | cut -b1-13
+	FINISH10MB=`date +%s%N | cut -b1-13`
 	wait
-	START100MB=date +%s%N | cut -b1-13
+	START100MB=`date +%s%N | cut -b1-13`
 	cat testfile100mb | ./client -addr=10.0.4.4:4433 > testfile100mb.result
-	FINISH100MB=date +%s%N | cut -b1-13
+	FINISH100MB=`date +%s%N | cut -b1-13`
 	wait
-	DURATION2MB=$FINISH2MB - $START2MB
-	DURATION10MB=$FINISH10MB - $START10MB
-	DURATION100MB=$FINISH100MB - $START100MB
-	DURATION2MB=$DURATION2MB / 1000
-	DURATION10MB=$DURATION10MB / 1000
-	DURATION100MB=$DURATION100MB / 1000
-	DURATION2MB=$DURATION2MB / 2000
-	DURATION10MB=$DURATION10MB / 10000
-	DURATION100MB=$DURATION100MB / 100000
+	DURATION2MB=$(( FINISH2MB - START2MB ))
+	DURATION10MB=$(( FINISH10MB - START10MB ))
+	DURATION100MB=$(( FINISH100MB - START100MB ))
+	DURATION2MB=$(( DURATION2MB / 1000 ))
+	DURATION10MB=$(( DURATION10MB / 1000 ))
+	DURATION100MB=$(( DURATION100MB / 1000 ))
+	DURATION2MB=$(( DURATION2MB / 2000 ))
+	DURATION10MB=$(( DURATION10MB / 10000 ))
+	DURATION100MB=$(( DURATION100MB / 100000 ))
 	echo "2MB transfered with" $DURATION2MB "KB/s" >> bandwidth
 	echo "10MB transfered with" $DURATION10MB "KB/s" >> bandwidth
 	echo "100MB transfered with" $DURATION100MB "KB/s" >> bandwidth 
