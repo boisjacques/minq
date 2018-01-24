@@ -138,7 +138,7 @@ check_results "Loss"
 deactivate_netem
 wait
 
-cat results > `date`_results
+cat results > `date '+%Y_%m_%d__%H_%M_%S'`_results
 
 
 rm results
