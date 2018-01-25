@@ -113,14 +113,15 @@ wait
 ./client -addr=10.0.1.10:4433
 wait
 
+echo "Running test without wire errors"
 counter=0
 while [ $counter -lt 100 ]; do
-	echo "Running test without wire errors"
+	echo "Executing test # " $counter+1
 	run_tests
 	check_results "Plain"
 	counter=$counter+1
 done
-
+wait
 cat results > `date '+%Y_%m_%d__%H_%M_%S'`_plain_results
 cat bandwidth >> `date '+%Y_%m_%d__%H_%M_%S'`_plain_results
 rm results
@@ -130,13 +131,13 @@ echo "Running test with loss"
 activate_loss
 counter=0
 while [ $counter -lt 100 ]; do
+	echo "Executing test # " $counter+1
 	run_tests
 	check_results "Loss"
 	counter=$counter+1
 done
 deactivate_netem
 wait
-
 cat results > `date '+%Y_%m_%d__%H_%M_%S'`_loss_results
 cat bandwidth >> `date '+%Y_%m_%d__%H_%M_%S'`_loss_results
 rm results
@@ -147,14 +148,13 @@ activate_delay
 wait	
 counter=0
 while [ $counter -lt 100 ]; do
-
+	echo "Executing test # " $counter+1
 	run_tests
 	check_results "Delay"
 	counter=$counter+1
 done
 deactivate_netem
 wait
-
 cat results > `date '+%Y_%m_%d__%H_%M_%S'`_delay_results
 cat bandwidth >> `date '+%Y_%m_%d__%H_%M_%S'`_delay_results
 rm results
