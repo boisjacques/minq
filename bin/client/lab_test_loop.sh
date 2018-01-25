@@ -116,8 +116,9 @@ wait
 echo "Running test without wire errors"
 counter=0
 while [ $counter -lt 100 ]; do
-	echo "Executing test # " $counter+1
+	echo "Executing test #"$counter
 	run_tests
+	wait
 	check_results "Plain"
 	counter=$counter+1
 done
@@ -131,8 +132,9 @@ echo "Running test with loss"
 activate_loss
 counter=0
 while [ $counter -lt 100 ]; do
-	echo "Executing test # " $counter+1
+	echo "Executing test #"$counter
 	run_tests
+	wait
 	check_results "Loss"
 	counter=$counter+1
 done
@@ -148,8 +150,9 @@ activate_delay
 wait	
 counter=0
 while [ $counter -lt 100 ]; do
-	echo "Executing test # " $counter+1
+	echo "Executing test #"$counter+1
 	run_tests
+	wait
 	check_results "Delay"
 	counter=$counter+1
 done
