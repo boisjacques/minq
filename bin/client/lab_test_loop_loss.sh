@@ -116,13 +116,13 @@ wait
 
 
 echo "Running test with delay"
-activate_delay
+activate_loss
 wait	
 for ((i=1;i<=100;i++)); do
 	echo "Executing test #"$i
 	run_tests
 	wait
-	check_results "Delay"
+	check_results "Loss"
 done
 deactivate_netem
 wait
