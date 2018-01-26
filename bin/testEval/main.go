@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"fmt"
 	"strings"
+	"strconv"
 )
 
 func main(){
@@ -27,9 +28,9 @@ func main(){
 		line := scanner.Text()
 		if string(line[0]) == "2"{
 			twoMbTest = append(twoMbTest, line)
-		} else if string(line[:1]) == "10"{
+		} else if string(line[0:2]) == "10" && string(line[2]) != "0"{
 			tenMbTest = append(tenMbTest, line)
-		} else if string(line[:2]) == "100"{
+		} else if string(line[0:3]) == "100"{
 			hundredMbTest = append(hundredMbTest, line)
 		} else {
 			result = append(result, line)
@@ -39,28 +40,38 @@ func main(){
 	times2mb := make([]string, 0)
 	times10mb := make([]string, 0)
 	times100mb := make([]string, 0)
-	results := make([]string, 0)
 
 
 	for _,line := range twoMbTest{
-		lineSplit := strings.Split("  ", line)
-		times2mb = append(times2mb, lineSplit[1])
+		lineSplit := strings.Split(line, " ")
+		i, err := strconv.Atoi(lineSplit[4])
+		if err != nil {
+			fmt.Println(err)
+		}
+		i -= 3
+		times2mb = append(times2mb, strconv.Itoa(i))
 	}
 
 	for _,line := range tenMbTest{
-		lineSplit := strings.Split("  ", line)
-		times10mb = append(times10mb, lineSplit[1])
+		lineSplit := strings.Split(line, " ")
+		i, err := strconv.Atoi(lineSplit[4])
+		if err != nil {
+			fmt.Println(err)
+		}
+		i -= 3
+		times10mb = append(times10mb, strconv.Itoa(i))
 	}
 
 	for _,line := range hundredMbTest{
-		lineSplit := strings.Split("  ", line)
-		times100mb = append(times100mb, lineSplit[1])
+		lineSplit := strings.Split(line, " ")
+		i, err := strconv.Atoi(lineSplit[4])
+		if err != nil {
+			fmt.Println(err)
+		}
+		i -= 3
+		times100mb = append(times100mb, strconv.Itoa(i))
 	}
 
-	for _,line := range results{
-		lineSplit := strings.Split(" ", line)
-		times2mb = append(times2mb, lineSplit[3])
-	}
 
 	file, err := os.Create("2mb.result")
 	if err != nil {
@@ -97,12 +108,22 @@ func main(){
 		fmt.Fprintln(w, line)
 	}
 
-	passed := 0
-	for _,line := range results{
+	passed2mb := 0
+	passed10mb := 0
+	passed100mb := 0
+	for _,line := range result{
 		if strings.Contains(line, "passed"){
-			passed++
+			if strings.Contains(line, "2MB"){
+				passed2mb++
+			} else if strings.Contains(line, "10MB"){
+				passed10mb++
+			} else if strings.Contains(line, "100MB"){
+				passed100mb++
+			}
 		}
 	}
 
-	fmt.Println("Tests passed: ", passed)
+	fmt.Println("2MB Tests passed: ", passed2mb)
+	fmt.Println("10MB Tests passed: ", passed10mb)
+	fmt.Println("100MB Tests passed: ", passed100mb)
 }
