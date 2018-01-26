@@ -114,13 +114,11 @@ wait
 wait
 
 echo "Running test without wire errors"
-counter=0
-while [ $counter -lt 100 ]; do
-	echo "Executing test #"$counter
+for ((i=1;i<=100;i++)); do
+	echo "Executing test #"$i
 	run_tests
 	wait
 	check_results "Plain"
-	counter=$counter+1
 done
 wait
 cat results > `date '+%Y_%m_%d__%H_%M_%S'`_plain_results
@@ -130,13 +128,11 @@ rm bandwidth
 
 echo "Running test with loss"
 activate_loss
-counter=0
-while [ $counter -lt 100 ]; do
-	echo "Executing test #"$counter
+for ((i=1;i<=100;i++)); do
+	echo "Executing test #"$i
 	run_tests
 	wait
 	check_results "Loss"
-	counter=$counter+1
 done
 deactivate_netem
 wait
@@ -148,13 +144,11 @@ rm bandwidth
 echo "Running test with delay"
 activate_delay
 wait	
-counter=0
-while [ $counter -lt 100 ]; do
-	echo "Executing test #"$counter+1
+for ((i=1;i<=100;i++)); do
+	echo "Executing test #"$i
 	run_tests
 	wait
 	check_results "Delay"
-	counter=$counter+1
 done
 deactivate_netem
 wait
