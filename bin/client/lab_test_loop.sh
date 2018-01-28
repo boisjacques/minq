@@ -154,8 +154,10 @@ deactivate_netem
 wait
 cat results > `date '+%Y_%m_%d__%H_%M_%S'`_delay_results
 cat bandwidth >> `date '+%Y_%m_%d__%H_%M_%S'`_delay_results
-rm results
-rm bandwidth
+
+foldername `date '+%Y_%m_%d__%H_%M_%S'`
+mv results $foldername
+mv bandwidth $foldername
 
 rm *.result
 rm client

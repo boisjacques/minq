@@ -48,7 +48,7 @@ func main(){
 		if err != nil {
 			fmt.Println(err)
 		}
-		i -= 3
+		i = i-3
 		times2mb = append(times2mb, strconv.Itoa(i))
 	}
 
@@ -58,7 +58,7 @@ func main(){
 		if err != nil {
 			fmt.Println(err)
 		}
-		i -= 3
+		i = i-3
 		times10mb = append(times10mb, strconv.Itoa(i))
 	}
 
@@ -68,44 +68,24 @@ func main(){
 		if err != nil {
 			fmt.Println(err)
 		}
-		i -= 3
+		i = i-3
 		times100mb = append(times100mb, strconv.Itoa(i))
 	}
 
 
-	file, err := os.Create("2mb.result")
-	if err != nil {
-		return
-	}
-	defer file.Close()
-
-	w := bufio.NewWriter(file)
+	fmt.Println("2MB test times")
 	for _, line := range times2mb {
-		fmt.Fprintln(w, line)
+		fmt.Println(line)
 	}
 
-
-	file, err = os.Create("10mb.result")
-	if err != nil {
-		return
-	}
-	defer file.Close()
-
-	w = bufio.NewWriter(file)
-	for _, line := range times2mb {
-		fmt.Fprintln(w, line)
+	fmt.Println("10MB test times")
+	for _, line := range times10mb {
+		fmt.Println(line)
 	}
 
-
-	file, err = os.Create("100mb.result")
-	if err != nil {
-		return
-	}
-	defer file.Close()
-
-	w = bufio.NewWriter(file)
-	for _, line := range times2mb {
-		fmt.Fprintln(w, line)
+	fmt.Println("100MB test times")
+	for _, line := range times100mb {
+		fmt.Println(line)
 	}
 
 	passed2mb := 0
