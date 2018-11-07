@@ -81,10 +81,12 @@ func isFatalError(e interface{}) bool {
 }
 
 // Return codes.
-var ErrorWouldBlock = nonFatalError("Would have blocked")
+var ErrorWouldBlock = nonFatalError("Would have blocked (QUIC)")
 var ErrorDestroyConnection = fatalError("Terminate connection")
 var ErrorReceivedVersionNegotiation = fatalError("Received a version negotiation packet advertising a different version than ours")
 var ErrorConnIsClosed = fatalError("Connection is closed")
+var ErrorConnIsClosing = nonFatalError("Connection is closing")
+var ErrorStreamReset = fatalError("Stream was reset")
 var ErrorStreamIsClosed = fatalError("Stream is closed")
 var ErrorInvalidPacket = nonFatalError("Invalid packet")
 var ErrorConnectionTimedOut = fatalError("Connection timed out")
@@ -92,6 +94,7 @@ var ErrorMissingValue = fatalError("Expected value is missing")
 var ErrorInvalidEncoding = fatalError("Invalid encoding")
 var ErrorProtocolViolation = fatalError("Protocol violation")
 var ErrorFrameFormatError = fatalError("Frame format error")
+var ErrorFlowControlError = fatalError("Flow control error")
 
 // Protocol errors
 type ErrorCode uint16

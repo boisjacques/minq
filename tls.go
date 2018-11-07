@@ -3,8 +3,9 @@ package minq
 import (
 	"crypto"
 	"crypto/x509"
-	"encoding/hex"
 	"fmt"
+	"log"
+
 	"github.com/bifurcation/mint"
 )
 
@@ -28,6 +29,7 @@ func (c *TlsConfig) toMint() *mint.Config {
 			NonBlocking:        true,
 			NextProtos:         []string{kQuicALPNToken},
 			SendSessionTickets: true,
+			AllowEarlyData:     true,
 		}
 
 		if c.ForceHrr {
@@ -35,6 +37,7 @@ func (c *TlsConfig) toMint() *mint.Config {
 		}
 
 		config.CookieProtector, _ = mint.NewDefaultCookieProtector()
+		config.InsecureSkipVerify = true // TODO(ekr@rtfm.com): This is horribly insecure, but Minq is right now for testing
 
 		if c.CertificateChain != nil && c.Key != nil {
 			config.Certificates =
@@ -44,11 +47,22 @@ func (c *TlsConfig) toMint() *mint.Config {
 						PrivateKey: c.Key,
 					},
 				}
+		} else {
+			priv, cert, err := mint.MakeNewSelfSignedCert(c.ServerName, mint.ECDSA_P256_SHA256)
+			if err != nil {
+				log.Fatalf("Couldn't make self-signed cert %v", err)
+			}
+			config.Certificates = []*mint.Certificate{
+				{
+					Chain:      []*x509.Certificate{cert},
+					PrivateKey: priv,
+				},
+			}
 		}
 		config.Init(false)
 		c.mintConfig = &config
 	}
-	return c.mintConfig
+	return c.mintConfig.Clone()
 }
 
 func NewTlsConfig(serverName string) TlsConfig {
@@ -58,51 +72,45 @@ func NewTlsConfig(serverName string) TlsConfig {
 }
 
 type tlsConn struct {
-	conn     *connBuffer
-	tls      *mint.Conn
-	finished bool
-	cs       *mint.CipherSuiteParams
+	config     *TlsConfig
+	conn       *Connection
+	mintConfig *mint.Config
+	tls        *mint.Conn
+	finished   bool
+	cs         *mint.CipherSuiteParams
 }
 
-func newTlsConn(conf TlsConfig, role uint8) *tlsConn {
+func newTlsConn(conn *Connection, conf *TlsConfig, role Role) *tlsConn {
 	isClient := true
 	if role == RoleServer {
 		isClient = false
 	}
 
-	c := newConnBuffer()
-
+	mc := conf.toMint()
+	mc.RecordLayer = newRecordLayerFactory(conn)
 	return &tlsConn{
-		c,
-		mint.NewConn(c, conf.toMint(), isClient),
+		conf,
+		conn,
+		mc,
+		mint.NewConn(nil, mc, isClient),
 		false,
 		nil,
 	}
 }
 
 func (c *tlsConn) setTransportParametersHandler(h *transportParametersHandler) {
-	c.tls.SetExtensionHandler(h)
+	c.mintConfig.ExtensionHandler = h
 }
 
-func (c *tlsConn) handshake(input []byte) ([]byte, error) {
-	logf(logTypeTls, "TLS handshake input len=%v", len(input))
-	logf(logTypeTrace, "TLS handshake input = %v", hex.EncodeToString(input))
-	if input != nil {
-		err := c.conn.input(input)
-		if err != nil {
-			return nil, err
-		}
-	}
-
+func (c *tlsConn) handshake() error {
 outer:
 	for {
-		logf(logTypeTls, "Calling Mint handshake")
 		alert := c.tls.Handshake()
 		hst := c.tls.GetHsState()
 		switch alert {
 		case mint.AlertNoAlert, mint.AlertStatelessRetry:
 			if hst == mint.StateServerConnected || hst == mint.StateClientConnected {
-				st := c.tls.State()
+				st := c.tls.ConnectionState()
 
 				logf(logTypeTls, "TLS handshake complete")
 				logf(logTypeTls, "Negotiated ALPN = %v", st.NextProto)
@@ -113,6 +121,7 @@ outer:
 				cs := st.CipherSuite
 				c.cs = &cs
 				c.finished = true
+
 				break outer
 			}
 			// Loop
@@ -120,17 +129,21 @@ outer:
 			logf(logTypeTls, "TLS would have blocked")
 			break outer
 		default:
-			return nil, fmt.Errorf("TLS sent an alert %v", alert)
+			return fmt.Errorf("TLS sent an alert %v", alert)
 		}
 	}
-
-	logf(logTypeTls, "TLS wrote %d bytes", c.conn.OutputLen())
-
-	return c.conn.getOutput(), nil
+	return nil
 }
 
-func (c *tlsConn) computeExporter(label string) ([]byte, error) {
-	return c.tls.ComputeExporter(label, []byte{}, c.cs.Hash.Size())
+func (c *tlsConn) postHandshake() error {
+	b := make([]byte, 1)
+
+	n, err := c.tls.Read(b)
+	assert(n == 0) // This can't happen
+	if err == nil || err == mint.AlertWouldBlock {
+		return nil
+	}
+	return ErrorProtocolViolation
 }
 
 func (c *tlsConn) getHsState() string {

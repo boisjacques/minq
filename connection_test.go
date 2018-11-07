@@ -1,8 +1,12 @@
 package minq
 
 import (
+	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"testing"
+	"time"
 )
 
 type testPacket struct {
@@ -45,6 +49,11 @@ func (t *testTransportPipe) Recv() *testPacket {
 func (t *testTransportPipe) Flush() {
 	t.out = append(t.out, t.in...)
 	t.in = make([]*testPacket, 0)
+}
+
+func (t *testTransportPipe) Clear() {
+	t.in = make([]*testPacket, 0)
+	t.out = make([]*testPacket, 0)
 }
 
 type testTransport struct {
@@ -118,7 +127,10 @@ func inputAllCapture(c *Connection) ([][]byte, error) {
 	}
 }
 
-var testTlsConfig = NewTlsConfig("localhost")
+func testTlsConfig() *TlsConfig {
+	t := NewTlsConfig("localhost")
+	return &t
+}
 
 type csPair struct {
 	client *Connection
@@ -129,10 +141,10 @@ func newCsPair(t *testing.T) *csPair {
 	ah := NewAddressHelper()
 	cTrans, sTrans := newTestTransportPair(true)
 
-	client := NewConnection(cTrans, RoleClient, testTlsConfig, nil, ah)
+	client := NewConnection(cTrans, RoleClient, testTlsConfig(), nil)
 	assertNotNil(t, client, "Couldn't make client")
 
-	server := NewConnection(sTrans, RoleServer, testTlsConfig, nil, ah)
+	server := NewConnection(sTrans, RoleServer, testTlsConfig(), nil)
 	assertNotNil(t, server, "Couldn't make server")
 
 	return &csPair{
@@ -142,10 +154,10 @@ func newCsPair(t *testing.T) *csPair {
 }
 
 func (pair *csPair) handshake(t *testing.T) {
-	err := pair.client.sendClientInitial()
+	_, err := pair.client.CheckTimer()
 	assertNotError(t, err, "Couldn't send client initial packet")
 
-	for pair.client.state != StateEstablished && pair.server.state != StateEstablished {
+	for pair.client.state != StateEstablished || pair.server.state != StateEstablished {
 		err = inputAll(pair.server)
 		assertNotError(t, err, "Error processing CI")
 
@@ -159,25 +171,25 @@ func TestSendCI(t *testing.T) {
 
 	cTrans, _ := newTestTransportPair(true)
 
-	client := NewConnection(cTrans, RoleClient, testTlsConfig, nil, ah)
+	client := NewConnection(cTrans, RoleClient, testTlsConfig(), nil)
 	assertNotNil(t, client, "Couldn't make client")
 
-	err := client.sendClientInitial()
-	assertNotError(t, err, "Couldn't send client initial packet")
+	_, err := client.CheckTimer()
+	assertNotError(t, err, "Couldn't check timer")
 }
 
 func TestSendReceiveCIOnly(t *testing.T) {
 	ah := NewAddressHelper()
 	cTrans, sTrans := newTestTransportPair(true)
 
-	client := NewConnection(cTrans, RoleClient, testTlsConfig, nil, ah)
+	client := NewConnection(cTrans, RoleClient, testTlsConfig(), nil)
 	assertNotNil(t, client, "Couldn't make client")
 
-	server := NewConnection(sTrans, RoleServer, testTlsConfig, nil, ah)
+	server := NewConnection(sTrans, RoleServer, testTlsConfig(), nil)
 	assertNotNil(t, server, "Couldn't make server")
 
-	err := client.sendClientInitial()
-	assertNotError(t, err, "Couldn't send client initial packet")
+	_, err := client.CheckTimer()
+	assertNotError(t, err, "Couldn't check timer")
 
 	err = inputAll(server)
 
@@ -189,19 +201,21 @@ func TestSendReceiveDupCI(t *testing.T) {
 
 	cTrans, sTrans := newTestTransportPair(true)
 
-	client := NewConnection(cTrans, RoleClient, testTlsConfig, nil, ah)
+	client := NewConnection(cTrans, RoleClient, testTlsConfig(), nil)
 	assertNotNil(t, client, "Couldn't make client")
 
-	server := NewConnection(sTrans, RoleServer, testTlsConfig, nil, ah)
+	server := NewConnection(sTrans, RoleServer, testTlsConfig(), nil)
 	assertNotNil(t, server, "Couldn't make server")
 
-	err := client.sendClientInitial()
+	n, err := client.CheckTimer()
 	assertNotError(t, err, "Couldn't send client initial packet")
 
 	err = inputAll(server)
 	assertNotError(t, err, "Error processing CI")
 
-	n, err := client.CheckTimer()
+	time.Sleep(kDefaultInitialRtt + 10*time.Millisecond)
+
+	n, err = client.CheckTimer()
 	assertNotError(t, err, "Couldn't check timer on client")
 	assertEquals(t, n, 1)
 
@@ -214,20 +228,20 @@ func TestSendReceiveCISI(t *testing.T) {
 
 	cTrans, sTrans := newTestTransportPair(true)
 
-	client := NewConnection(cTrans, RoleClient, testTlsConfig, nil, ah)
+	client := NewConnection(cTrans, RoleClient, testTlsConfig(), nil)
 	assertNotNil(t, client, "Couldn't make client")
 
-	server := NewConnection(sTrans, RoleServer, testTlsConfig, nil, ah)
+	server := NewConnection(sTrans, RoleServer, testTlsConfig(), nil)
 	assertNotNil(t, server, "Couldn't make server")
 
-	err := client.sendClientInitial()
-	assertNotError(t, err, "Couldn't send client initial packet")
+	_, err := client.CheckTimer()
+	assertNotError(t, err, "Couldn't check timer")
 
 	err = inputAll(server)
 	assertNotError(t, err, "Error processing CI")
 
 	err = inputAll(client)
-	assertNotError(t, err, "Error processing SH")
+	assertNotError(t, err, "Error processing SH...SFIN")
 
 	err = inputAll(server)
 	assertNotError(t, err, "Error processing CFIN")
@@ -235,31 +249,75 @@ func TestSendReceiveCISI(t *testing.T) {
 	err = inputAll(client)
 	assertNotError(t, err, "Error processing NST")
 
-	err = inputAll(server)
-	assertNotError(t, err, "Error processing CFIN")
-
-	// All the server's and client's data should be acked.
-	n := server.outstandingQueuedBytes()
-	assertEquals(t, 0, n)
-
-	// But the client still has-unacked-data
-	n = client.outstandingQueuedBytes()
-	assertEquals(t, 0, n)
-
-	fmt.Println("Checking client state")
 	assertEquals(t, client.state, StateEstablished)
-	fmt.Println("Checking server state")
 	assertEquals(t, server.state, StateEstablished)
 
 	// Run the client's checkTimer, which shouldn't do
 	// anything because you don't ACK acks.
-	n, err = client.CheckTimer()
+	n, err := client.CheckTimer()
 	assertNotError(t, err, "Couldn't run client timer")
 	assertEquals(t, 0, n)
 
 	n, err = server.CheckTimer()
 	assertNotError(t, err, "Couldn't run server timer")
 	assertEquals(t, 0, n)
+}
+
+func makeCompoundPacket(q *[]*testPacket) error {
+	var merged []byte
+	// Iterate through concatenating packets and removing them.  Once
+	// a short header is found, then break and replace that packet
+	// with a single compound packet.
+	for {
+		p := (*q)[0]
+		merged = append(merged, p.b...)
+		if p.b[0]&byte(packetFlagLongHeader) == 0 {
+			break
+		}
+		(*q) = (*q)[1:]
+	}
+	if len(merged) == 0 {
+		return errors.New("can't make compound packet")
+	}
+	(*q)[0] = &testPacket{merged}
+	return nil
+}
+
+func TestCompoundPacket(t *testing.T) {
+	pair := newCsPair(t)
+
+	_, err := pair.client.CheckTimer()
+	assertNotError(t, err, "send Initial")
+	err = inputAll(pair.server)
+	assertNotError(t, err, "Error processing Initial")
+	err = inputAll(pair.client)
+	assertNotError(t, err, "Error processing server Handshake")
+
+	s := pair.client.CreateStream()
+	assertNotNil(t, s, "Stream not created")
+	testString := []byte("abcedef")
+	_, err = s.Write(testString)
+	assertNotError(t, err, "Can't write from client")
+
+	// Now assemble a compound packet.
+	fmt.Println("Making compound packet")
+	transport := pair.server.transport.(*testTransport)
+	err = makeCompoundPacket(&transport.r.out)
+	assertNotError(t, err, "couldn't make compound packet")
+
+	err = inputAll(pair.server)
+	buf := make([]byte, len(testString))
+	_, err = pair.server.GetStream(s.Id()).Read(buf)
+	assertNotError(t, err, "Can't read data from server")
+	assertByteEquals(t, buf, testString)
+}
+
+func drain(t *testing.T, c *Connection) {
+	// Reach into the connection and frob the timer so that we don't have to wait.
+	c.closingEnd = time.Now().Add(-1 * time.Microsecond)
+	_, err := c.CheckTimer()
+	assertEquals(t, err, ErrorConnIsClosed)
+	assertEquals(t, c.GetState(), StateClosed)
 }
 
 func TestSendReceiveData(t *testing.T) {
@@ -272,44 +330,60 @@ func TestSendReceiveData(t *testing.T) {
 	pair.server.CheckTimer()
 	err := inputAll(pair.client)
 
+	// Things should now be quiescent
+	n, err := pair.client.CheckTimer()
+	assertNotError(t, err, "Checking timer should do nothing")
+	assertEquals(t, 0, n)
+
+	n, err = pair.server.CheckTimer()
+	assertNotError(t, err, "Checking timer should do nothing")
+	assertEquals(t, 0, n)
+
 	// Write data C->S
 	cs := pair.client.CreateStream()
+	assertEquals(t, uint64(0), cs.Id())
 	assertNotNil(t, cs, "Failed to create a stream")
 	cs.Write(testString)
 
 	// Read data C->S
 	err = inputAll(pair.server)
 	assertNotError(t, err, "Couldn't read input packets")
-	ss := pair.server.GetStream(1)
-	b := ss.readAll()
+	ss := pair.server.GetStream(0)
+	b, err := ioutil.ReadAll(ss)
+	assertEquals(t, ErrorWouldBlock, err)
 	assertNotNil(t, b, "Read data from server")
 	assertByteEquals(t, []byte(testString), b)
 
 	// Write data S->C
-	for i, _ := range b {
+	for i := range b {
 		b[i] ^= 0xff
 	}
 	ss.Write(b)
 
 	// Read data C->S
 	err = inputAll(pair.client)
-	b2 := cs.readAll()
+	b2, err := ioutil.ReadAll(cs)
+	assertEquals(t, ErrorWouldBlock, err)
 	assertNotNil(t, b2, "Read data from client")
 	assertByteEquals(t, b, b2)
 
 	// Check that we only create streams in one direction
 	cs = pair.client.CreateStream()
-	assertEquals(t, uint32(3), cs.Id())
-	assertNotNil(t, pair.client.GetStream(3), "Stream 3 should exist")
+	assertEquals(t, uint64(4), cs.Id())
+	assertNotNil(t, pair.client.GetStream(4), "Stream 4 should exist")
 	assertX(t, pair.client.GetStream(2) == nil, "Stream 2 should not exist")
 
 	// Close the client.
 	pair.client.Close()
+	assertEquals(t, pair.client.GetState(), StateClosing)
 
 	// Read the close.
 	err = inputAll(pair.server)
 	assertNotError(t, err, "Read close")
-	assertEquals(t, pair.server.GetState(), StateClosed)
+	assertEquals(t, pair.server.GetState(), StateClosing)
+
+	drain(t, pair.client)
+	drain(t, pair.server)
 }
 
 type testReceiveHandler struct {
@@ -318,6 +392,8 @@ type testReceiveHandler struct {
 	done bool
 }
 
+var _ ConnectionHandler = &testReceiveHandler{}
+
 func newTestReceiveHandler(t *testing.T) *testReceiveHandler {
 	return &testReceiveHandler{t: t}
 }
@@ -325,10 +401,13 @@ func newTestReceiveHandler(t *testing.T) *testReceiveHandler {
 func (h *testReceiveHandler) StateChanged(s State) {
 }
 
-func (h *testReceiveHandler) NewStream(s *Stream) {
+func (h *testReceiveHandler) NewStream(s Stream) {
 }
 
-func (h *testReceiveHandler) StreamReadable(s *Stream) {
+func (h *testReceiveHandler) NewRecvStream(s RecvStream) {
+}
+
+func (h *testReceiveHandler) StreamReadable(s RecvStream) {
 	for {
 		b := make([]byte, 1024)
 
@@ -338,7 +417,7 @@ func (h *testReceiveHandler) StreamReadable(s *Stream) {
 			break
 		case ErrorWouldBlock:
 			return
-		case ErrorStreamIsClosed, ErrorConnIsClosed:
+		case ErrorStreamReset, ErrorConnIsClosed, io.EOF:
 			h.done = true
 			return
 		default:
@@ -355,7 +434,7 @@ func TestSendReceiveBigData(t *testing.T) {
 	pair.handshake(t)
 	buf := make([]byte, 100000)
 
-	for i, _ := range buf {
+	for i := range buf {
 		buf[i] = byte(i & 0xff)
 	}
 
@@ -364,12 +443,16 @@ func TestSendReceiveBigData(t *testing.T) {
 
 	// Write data C->S
 	cs := pair.client.CreateStream()
-	cs.Write(buf)
-	cs.Close()
-
+	remaining := buf
 	for !handler.done {
-		inputAll(pair.server)
-		inputAll(pair.client)
+		if len(remaining) > 0 {
+			n, err := cs.Write(remaining)
+			assertNotError(t, err, "write should work")
+			remaining = remaining[n:]
+			if len(remaining) == 0 {
+				cs.Close()
+			}
+		}
 		inputAll(pair.server)
 		inputAll(pair.client)
 	}
@@ -399,7 +482,7 @@ func TestSendReceiveRetransmit(t *testing.T) {
 	// Read data C->S
 	err = inputAll(pair.server)
 	assertNotError(t, err, "Couldn't read input packets")
-	ss := pair.server.GetStream(1)
+	ss := pair.server.GetStream(0)
 	b := make([]byte, 1024)
 	n, err := ss.Read(b)
 	assertNotError(t, err, "Error reading")
@@ -407,7 +490,7 @@ func TestSendReceiveRetransmit(t *testing.T) {
 	assertByteEquals(t, []byte(testString), b)
 
 	// Write data S->C
-	for i, _ := range b {
+	for i := range b {
 		b[i] ^= 0xff
 	}
 	ss.Write(b)
@@ -452,7 +535,7 @@ func TestSendReceiveStreamFin(t *testing.T) {
 	// Read data C->S
 	err = inputAll(pair.server)
 	assertNotError(t, err, "Couldn't read input packets")
-	ss := pair.server.GetStream(1)
+	ss := pair.server.GetStream(0)
 	b := make([]byte, 1024)
 	n, err = ss.Read(b)
 	assertNotError(t, err, "Couldn't read from client")
@@ -461,7 +544,7 @@ func TestSendReceiveStreamFin(t *testing.T) {
 
 	b = make([]byte, 1024)
 	n, err = ss.Read(b)
-	assertEquals(t, err, ErrorStreamIsClosed)
+	assertEquals(t, err, io.EOF)
 	assertEquals(t, 0, n)
 }
 
@@ -481,7 +564,7 @@ func TestSendReceiveStreamRst(t *testing.T) {
 	cs.Write(testString)
 
 	// Now reset the stream.
-	cs.Reset(kQuicErrorNoError)
+	cs.Reset(0)
 
 	// Verify that we cannot write.
 	n, err := cs.Write(testString)
@@ -491,10 +574,10 @@ func TestSendReceiveStreamRst(t *testing.T) {
 	// Read data C->S. Should result in no data.
 	err = inputAll(pair.server)
 	assertNotError(t, err, "Couldn't read input packets")
-	ss := pair.server.GetStream(1)
+	ss := pair.server.GetStream(0)
 	b := make([]byte, 1024)
 	n, err = ss.Read(b)
-	assertEquals(t, err, ErrorStreamIsClosed)
+	assertEquals(t, err, ErrorStreamReset)
 	assertEquals(t, 0, n)
 }
 
@@ -503,15 +586,15 @@ func TestVersionNegotiationPacket(t *testing.T) {
 
 	cTrans, sTrans := newTestTransportPair(true)
 
-	client := NewConnection(cTrans, RoleClient, testTlsConfig, nil, ah)
+	client := NewConnection(cTrans, RoleClient, testTlsConfig(), nil)
 	assertNotNil(t, client, "Couldn't make client")
 	// Set the client version to something bogus.
 	client.version = kQuicGreaseVersion2
 
-	server := NewConnection(sTrans, RoleServer, testTlsConfig, nil, ah)
+	server := NewConnection(sTrans, RoleServer, testTlsConfig(), nil)
 	assertNotNil(t, server, "Couldn't make server")
 
-	err := client.sendClientInitial()
+	_, err := client.CheckTimer()
 	assertNotError(t, err, "Couldn't send client initial packet")
 
 	err = inputAll(server)
@@ -526,32 +609,36 @@ func TestVersionNegotiationPacket(t *testing.T) {
 	_, err = decode(&hdr, cap[0])
 	assertNotError(t, err, "Couldn't decode VN")
 	// Check the error.
-	assertEquals(t, hdr.Version, kQuicGreaseVersion2)
-	assertEquals(t, hdr.ConnectionID, client.clientConnId)
+	assertEquals(t, hdr.Version, VersionNumber(0))
+	assertByteEquals(t, hdr.DestinationConnectionID, client.clientConnectionId)
+	assertByteEquals(t, hdr.SourceConnectionID, client.serverConnectionId)
 }
 
-func TestCantMakeRemoteStream(t *testing.T) {
+func TestCantMakeRemoteStreams(t *testing.T) {
 	ah := NewAddressHelper()
 
 	cTrans, _ := newTestTransportPair(true)
-	client := NewConnection(cTrans, RoleClient, testTlsConfig, nil, ah)
+	client := NewConnection(cTrans, RoleClient, testTlsConfig(), nil)
 
-	_, _, err := client.ensureStream(1, true)
-	assertEquals(t, ErrorProtocolViolation, err)
+	send := client.ensureSendStream(3) // 3 is a RecvStream for the client
+	assertEquals(t, nil, send)
+
+	recv := client.ensureRecvStream(2) // 2 is a SendStream for the client
+	assertEquals(t, nil, recv)
 }
 
-func TestStatelessRetry(t *testing.T) {
+func DISABLED_TestStatelessRetry(t *testing.T) {
 	ah := NewAddressHelper()
 
 	cTrans, sTrans := newTestTransportPair(true)
 
-	client := NewConnection(cTrans, RoleClient, testTlsConfig, nil, ah)
+	client := NewConnection(cTrans, RoleClient, testTlsConfig(), nil)
 	assertNotNil(t, client, "Couldn't make client")
 
-	hrrConfig := testTlsConfig
+	hrrConfig := *testTlsConfig()
 	hrrConfig.ForceHrr = true
 
-	server := NewConnection(sTrans, RoleServer, hrrConfig, nil, ah)
+	server := NewConnection(sTrans, RoleServer, &hrrConfig, nil)
 	assertNotNil(t, server, "Couldn't make server")
 
 	err := client.sendClientInitial()
@@ -579,4 +666,483 @@ func TestStatelessRetry(t *testing.T) {
 
 	assertEquals(t, StateEstablished, client.state)
 	assertEquals(t, StateEstablished, server.state)
+}
+
+func TestSessionResumption(t *testing.T) {
+	cTrans, sTrans := newTestTransportPair(true)
+
+	cconf := testTlsConfig()
+	client := NewConnection(cTrans, RoleClient, cconf, nil)
+	assertNotNil(t, client, "Couldn't make client")
+
+	sconf := testTlsConfig()
+	server := NewConnection(sTrans, RoleServer, sconf, nil)
+	assertNotNil(t, server, "Couldn't make server")
+
+	pair := csPair{client, server}
+	pair.handshake(t)
+
+	// Consume NST.
+	err := inputAll(pair.client)
+	assertNotError(t, err, "Couldn't read NST")
+
+	// Now rehandshake.
+	cTrans, sTrans = newTestTransportPair(true)
+	client = NewConnection(cTrans, RoleClient, cconf, nil)
+	assertNotNil(t, client, "Couldn't make client")
+	server = NewConnection(sTrans, RoleServer, sconf, nil)
+	assertNotNil(t, server, "Couldn't make server")
+	pair = csPair{client, server}
+	pair.handshake(t)
+}
+
+func TestZeroRTT(t *testing.T) {
+	cTrans, sTrans := newTestTransportPair(true)
+
+	cconf := testTlsConfig()
+	client := NewConnection(cTrans, RoleClient, cconf, nil)
+	assertNotNil(t, client, "Couldn't make client")
+
+	sconf := testTlsConfig()
+	server := NewConnection(sTrans, RoleServer, sconf, nil)
+	assertNotNil(t, server, "Couldn't make server")
+
+	pair := csPair{client, server}
+	pair.handshake(t)
+
+	// Consume NST.
+	err := inputAll(pair.client)
+	assertNotError(t, err, "Couldn't read NST")
+
+	logf(logTypeConnection, "Test Set: New Handshake")
+	// Now rehandshake.
+	cTrans, sTrans = newTestTransportPair(true)
+	client = NewConnection(cTrans, RoleClient, cconf, nil)
+	assertNotNil(t, client, "Couldn't make client")
+	server = NewConnection(sTrans, RoleServer, sconf, nil)
+	assertNotNil(t, server, "Couldn't make server")
+	pair = csPair{client, server}
+
+	_, err = client.CheckTimer()
+	assertNotError(t, err, "Couldn't check timer")
+
+	// Send in 0-RTT
+	testString := []byte("abcdef")
+	cs := pair.client.CreateStream()
+	assertEquals(t, uint64(0), cs.Id())
+	assertNotNil(t, cs, "Failed to create a stream")
+	_, err = cs.Write(testString)
+	assertNotError(t, err, "error writing in 0-RTT")
+
+	pair.handshake(t)
+
+	// Now read the 0-RTT data
+	ss := pair.server.GetStream(0)
+	b := make([]byte, 1024)
+	n, err := ss.Read(b)
+	assertNotError(t, err, "Read from client")
+	b = b[:n]
+	assertByteEquals(t, []byte(testString), b)
+}
+
+func TestZeroRTT1RTTRetransmit(t *testing.T) {
+	cTrans, sTrans := newTestTransportPair(true)
+
+	cconf := testTlsConfig()
+	client := NewConnection(cTrans, RoleClient, cconf, nil)
+	assertNotNil(t, client, "Couldn't make client")
+
+	sconf := testTlsConfig()
+	server := NewConnection(sTrans, RoleServer, sconf, nil)
+	assertNotNil(t, server, "Couldn't make server")
+
+	pair := csPair{client, server}
+	pair.handshake(t)
+
+	// Consume NST.
+	err := inputAll(pair.client)
+	assertNotError(t, err, "Couldn't read NST")
+
+	logf(logTypeConnection, "Test Set: New Handshake")
+	// Now rehandshake.
+	cTrans, sTrans = newTestTransportPair(true)
+	client = NewConnection(cTrans, RoleClient, cconf, nil)
+	assertNotNil(t, client, "Couldn't make client")
+	server = NewConnection(sTrans, RoleServer, sconf, nil)
+	assertNotNil(t, server, "Couldn't make server")
+	pair = csPair{client, server}
+
+	_, err = client.CheckTimer()
+	assertNotError(t, err, "Couldn't check timer")
+
+	err = inputAll(pair.server)
+	assertNotError(t, err, "Couldn't negotiate")
+
+	// Send in 0-RTT
+	testString := []byte("abcdef")
+	cs := pair.client.CreateStream()
+	assertEquals(t, uint64(0), cs.Id())
+	assertNotNil(t, cs, "Failed to create a stream")
+	_, err = cs.Write(testString)
+	assertNotError(t, err, "error writing in 0-RTT")
+
+	// Now erase the queue
+	cTrans.w.Clear()
+
+	// Now handshake
+	pair.handshake(t)
+
+	// The stream isn't available yet
+	ss := pair.server.GetStream(0)
+	assertEquals(t, nil, ss)
+
+	// The client should retransmit
+	time.Sleep(kDefaultInitialRtt + 10*time.Millisecond)
+	logf(logTypeConnection, "About to check timer. Should retransmit")
+	_, err = pair.client.CheckTimer()
+	assertNotError(t, err, "Error checking timer")
+
+	// Input the 1-RTT data.
+	err = inputAll(pair.server)
+	assertNotError(t, err, "read 1-RTT data")
+
+	// Now read the 1-RTT data
+	ss = pair.server.GetStream(0)
+	b := make([]byte, 1024)
+	n, err := ss.Read(b)
+	assertNotError(t, err, "Read from client")
+	b = b[:n]
+	assertByteEquals(t, []byte(testString), b)
+}
+
+type streamCatcher struct {
+	lastStream Stream
+	lastRecv   RecvStream
+}
+
+var _ ConnectionHandler = &streamCatcher{}
+
+func (sc *streamCatcher) StateChanged(s State)        {}
+func (sc *streamCatcher) StreamReadable(s RecvStream) {}
+
+func (sc *streamCatcher) NewStream(s Stream) {
+	sc.lastStream = s
+}
+
+func (sc *streamCatcher) NewRecvStream(s RecvStream) {
+	sc.lastRecv = s
+}
+
+func TestUnidirectionalStream(t *testing.T) {
+	cTrans, sTrans := newTestTransportPair(true)
+
+	cconf := testTlsConfig()
+	client := NewConnection(cTrans, RoleClient, cconf, nil)
+	assertNotNil(t, client, "Couldn't make client")
+
+	var catcher streamCatcher
+	sconf := testTlsConfig()
+	server := NewConnection(sTrans, RoleServer, sconf, &catcher)
+	assertNotNil(t, server, "Couldn't make server")
+
+	pair := csPair{client, server}
+	pair.handshake(t)
+
+	testString := []byte("abcdef")
+	cstream := client.CreateSendStream()
+	assertEquals(t, cstream, client.GetSendStream(2))
+	n, err := cstream.Write(testString)
+	assertNotError(t, err, "write should work")
+	assertEquals(t, n, len(testString))
+
+	err = inputAll(server)
+	assertNotError(t, err, "packets should be OK")
+
+	sstream := catcher.lastRecv
+	assertEquals(t, sstream, server.GetRecvStream(cstream.Id()))
+
+	d, err := ioutil.ReadAll(sstream)
+	assertEquals(t, ErrorWouldBlock, err)
+	assertNotNil(t, d, "Read data from client")
+	assertByteEquals(t, d, testString)
+
+	err = cstream.Close()
+	assertNotError(t, err, "close just works")
+	err = cstream.Close()
+	assertNotError(t, err, "close is idempotent")
+
+	err = inputAll(server)
+	assertNotError(t, err, "packets should be OK")
+
+	n, err = sstream.Read(d)
+	assertEquals(t, err, io.EOF)
+	assertEquals(t, n, 0)
+	assertEquals(t, sstream.RecvState(), RecvStreamStateDataRead)
+}
+
+func TestUnidirectionalStreamRst(t *testing.T) {
+	cTrans, sTrans := newTestTransportPair(true)
+
+	var catcher streamCatcher
+	cconf := testTlsConfig()
+	client := NewConnection(cTrans, RoleClient, cconf, &catcher)
+	assertNotNil(t, client, "Couldn't make client")
+
+	sconf := testTlsConfig()
+	server := NewConnection(sTrans, RoleServer, sconf, nil)
+	assertNotNil(t, server, "Couldn't make server")
+
+	pair := csPair{client, server}
+	pair.handshake(t)
+
+	testString := []byte("abcdef")
+	sstream := server.CreateSendStream()
+	assertEquals(t, sstream, server.GetSendStream(3))
+	n, err := sstream.Write(testString)
+	assertNotError(t, err, "write should work")
+	assertEquals(t, n, len(testString))
+
+	err = inputAll(client)
+	assertNotError(t, err, "packets should be OK")
+
+	cstream := catcher.lastRecv
+	assertEquals(t, cstream, client.GetRecvStream(sstream.Id()))
+
+	d, err := ioutil.ReadAll(cstream)
+	assertEquals(t, ErrorWouldBlock, err)
+	assertNotNil(t, d, "Read data from server")
+	assertByteEquals(t, d, testString)
+
+	err = sstream.Reset(77)
+	assertNotError(t, err, "reset works")
+
+	err = inputAll(client)
+	assertNotError(t, err, "packets should be OK")
+
+	assertEquals(t, cstream.RecvState(), RecvStreamStateResetRecvd)
+	n, err = cstream.Read(d)
+	assertEquals(t, err, ErrorStreamReset)
+	assertEquals(t, n, 0)
+	assertEquals(t, cstream.RecvState(), RecvStreamStateResetRead)
+}
+
+func TestUnidirectionalStreamRstImmediate(t *testing.T) {
+	pair := newCsPair(t)
+	pair.handshake(t)
+
+	sstream := pair.server.CreateSendStream()
+	err := sstream.Reset(45)
+	assertNotError(t, err, "reset works")
+
+	err = inputAll(pair.client)
+	assertNotError(t, err, "packets should be OK")
+
+	cstream := pair.client.GetRecvStream(sstream.Id())
+	assertEquals(t, cstream.RecvState(), RecvStreamStateResetRecvd)
+	var d [3]byte
+	n, err := cstream.Read(d[:])
+	assertEquals(t, err, ErrorStreamReset)
+	assertEquals(t, n, 0)
+	assertEquals(t, cstream.RecvState(), RecvStreamStateResetRead)
+}
+
+func TestUnidirectionalStopSending(t *testing.T) {
+	pair := newCsPair(t)
+	pair.handshake(t)
+
+	testString := []byte("abcdef")
+	cstream := pair.client.CreateSendStream()
+	n, err := cstream.Write(testString)
+	assertNotError(t, err, "write should work")
+	assertEquals(t, n, len(testString))
+
+	err = inputAll(pair.server)
+	assertNotError(t, err, "packets should be OK")
+
+	sstream := pair.server.GetRecvStream(cstream.Id())
+
+	d, err := ioutil.ReadAll(sstream)
+	assertEquals(t, ErrorWouldBlock, err)
+	assertNotNil(t, d, "Read data from client")
+	assertByteEquals(t, d, testString)
+
+	err = sstream.StopSending(0)
+	assertNotError(t, err, "stop sending just works")
+
+	err = inputAll(pair.client)
+	assertNotError(t, err, "packets should be OK")
+
+	assertEquals(t, cstream.SendState(), SendStreamStateResetSent)
+
+	err = inputAll(pair.server)
+	assertNotError(t, err, "packets should be OK")
+
+	assertEquals(t, sstream.RecvState(), RecvStreamStateResetRecvd)
+	n, err = sstream.Read(d)
+	assertEquals(t, err, ErrorStreamReset)
+	assertEquals(t, n, 0)
+	assertEquals(t, sstream.RecvState(), RecvStreamStateResetRead)
+}
+
+func TestBidirectionalStopSending(t *testing.T) {
+	pair := newCsPair(t)
+	pair.handshake(t)
+
+	// Open a stream at the client and start using it (until it is used, it can't
+	// exist at the server).
+	testString := []byte("abcdef")
+	cstream := pair.client.CreateStream()
+	n, err := cstream.Write(testString)
+	assertNotError(t, err, "write should work")
+	assertEquals(t, n, len(testString))
+
+	// Feed packets to the server.
+	err = inputAll(pair.server)
+	assertNotError(t, err, "packets should be OK")
+
+	// The server then reads from the stream.
+	sstream := pair.server.GetStream(cstream.Id())
+	d, err := ioutil.ReadAll(sstream)
+	assertEquals(t, err, ErrorWouldBlock)
+	assertNotNil(t, d, "Read data from client")
+	assertByteEquals(t, d, testString)
+
+	// Now to test.  The server sends STOP_SENDING.
+	testString2 := []byte("zyxwvut")
+	err = sstream.StopSending(0)
+	assertNotError(t, err, "stop sending just works")
+	assertEquals(t, sstream.RecvState(), RecvStreamStateRecv) // no change
+
+	// But it also continues to write to the stream.
+	n, err = sstream.Write(testString2)
+	assertNotError(t, err, "write should work")
+	assertEquals(t, n, len(testString2))
+	assertEquals(t, sstream.SendState(), SendStreamStateSend) // no change
+
+	// After reading, the client should have responded to STOP_SENDING with RST_STREAM.
+	err = inputAll(pair.client)
+	assertNotError(t, err, "packets should be OK")
+	assertEquals(t, cstream.SendState(), SendStreamStateResetSent)
+	assertEquals(t, cstream.RecvState(), RecvStreamStateRecv)
+
+	// Writing at the client now fails.
+	n, err = cstream.Write(testString)
+	assertEquals(t, err, ErrorStreamIsClosed)
+	assertEquals(t, n, 0)
+
+	// Reading can continue.
+	d, err = ioutil.ReadAll(cstream)
+	assertEquals(t, err, ErrorWouldBlock)
+	assertByteEquals(t, d, testString2)
+	assertEquals(t, sstream.RecvState(), RecvStreamStateRecv)
+
+	sstream.Close()
+
+	err = inputAll(pair.client)
+	assertNotError(t, err, "packets should be OK")
+
+	n, err = cstream.Read(d)
+	assertEquals(t, err, io.EOF)
+	assertEquals(t, n, 0)
+	assertEquals(t, cstream.RecvState(), RecvStreamStateDataRead)
+}
+
+func TestStreamIdBlocked(t *testing.T) {
+	pair := newCsPair(t)
+	pair.handshake(t)
+
+	for i := 0; i < kConcurrentStreamsBidi; i++ {
+		assertNotNil(t, pair.server.CreateStream(),
+			"create and discard a bidirectional stream")
+	}
+	assertEquals(t, nil, pair.server.CreateStream())
+
+	for i := 0; i < kConcurrentStreamsUni; i++ {
+		assertNotNil(t, pair.client.CreateSendStream(),
+			"create and discard a unidirectional stream")
+	}
+	assertEquals(t, nil, pair.client.CreateSendStream())
+	// TODO: check that both sides send STREAM_ID_BLOCKED
+}
+
+func fillConnectionCongestionWindow(c *Connection) ([]SendStream, []int, []byte) {
+	writeBuf := make([]byte, 1024)
+	for i := range writeBuf {
+		writeBuf[i] = byte(i & 0xff)
+	}
+	cstreams := make([]SendStream, int(kConcurrentStreamsUni))
+	outstanding := make([]int, int(kConcurrentStreamsUni))
+	for i := range cstreams {
+		s := c.CreateSendStream()
+		cstreams[i] = s
+		var err error
+		for err == nil {
+			var n int
+			n, err = s.Write(writeBuf)
+			outstanding[i] += n
+		}
+	}
+	return cstreams, outstanding, writeBuf
+}
+
+func TestConnectionLevelFlowControl(t *testing.T) {
+	pair := newCsPair(t)
+	pair.handshake(t)
+
+	cstreams,
+		outstanding,
+		writeBuf := fillConnectionCongestionWindow(pair.client)
+
+	// At this point, the client has exhausted its connection flow control credit.
+	// Let it send frames and have the server read some more.
+	inputAll(pair.server)
+
+	// Read a little bit from the server side.
+	readBuf := make([]byte, len(writeBuf))
+	sstream := pair.server.GetRecvStream(cstreams[0].Id())
+	for outstanding[0] > 0 {
+		n, err := sstream.Read(readBuf)
+		assertNotError(t, err, "if we wrote it, it should be read")
+		assertEquals(t, n, len(writeBuf))
+		assertByteEquals(t, readBuf, writeBuf[:n])
+		outstanding[0] -= n
+	}
+
+	// Now let the MAX_DATA frame propagate and check that we can write again.
+	pair.server.sendQueued(false)
+	inputAll(pair.client)
+
+	assertX(t, (uint64(kConcurrentStreamsUni-1)*kInitialMaxStreamData) > kInitialMaxData,
+		"should be able to fill connection flow control without using the last stream")
+	// Use the last stream, which shouldn't have written anything.
+	last := len(outstanding) - 1
+	assertEquals(t, outstanding[last], 0)
+	n, err := cstreams[last].Write(writeBuf)
+	assertNotError(t, err, "should write successfully")
+	assertEquals(t, n, len(writeBuf))
+}
+
+func TestConnectionLevelFlowControlRst(t *testing.T) {
+	pair := newCsPair(t)
+	pair.handshake(t)
+
+	cstreams,
+		outstanding,
+		writeBuf := fillConnectionCongestionWindow(pair.client)
+
+	// Connection flow control should be exhausted now.
+	// Now reset one of those streams.
+	cstreams[0].Reset(32)
+	inputAll(pair.server)
+
+	// Now let the MAX_DATA frame propagate and check that we can write again.
+	pair.server.sendQueued(false)
+	inputAll(pair.client)
+
+	// Use the last stream, which shouldn't have written anything.
+	last := len(outstanding) - 1
+	assertEquals(t, outstanding[last], 0)
+	n, err := cstreams[last].Write(writeBuf)
+	assertNotError(t, err, "should write successfully")
+	assertEquals(t, n, len(writeBuf))
 }

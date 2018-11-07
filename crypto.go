@@ -7,54 +7,51 @@ import (
 )
 
 type cryptoState struct {
-	secret []byte
-	aead   cipher.AEAD
+	aead cipher.AEAD
+	pne  pneCipherFactory
 }
 
-const kQuicVersionSalt = "afc824ec5fc77eca1e9d36f37fb2d46518c36639"
+func infallibleHexDecode(s string) []byte {
+	b, err := hex.DecodeString(s)
+	if err != nil {
+		panic("didn't hex decode " + s)
+	}
+	return b
+}
 
-const clientCtSecretLabel = "QUIC client cleartext Secret"
-const serverCtSecretLabel = "QUIC server cleartext Secret"
+var kQuicVersionSalt = infallibleHexDecode("9c108f98520a5c5c32968e950e8a2c5fe06d6c38")
 
-const clientPpSecretLabel = "EXPORTER-QUIC client 1-RTT Secret"
-const serverPpSecretLabel = "EXPORTER-QUIC server 1-RTT Secret"
+const clientCtSecretLabel = "client in"
+const serverCtSecretLabel = "server in"
+
+const clientPpSecretLabel = "EXPORTER-QUIC client 1rtt"
+const serverPpSecretLabel = "EXPORTER-QUIC server 1rtt"
 
 func newCryptoStateInner(secret []byte, cs *mint.CipherSuiteParams) (*cryptoState, error) {
 	var st cryptoState
 	var err error
 
-	st.secret = secret
-
-	k := mint.HkdfExpandLabel(cs.Hash, st.secret, "key", []byte{}, cs.KeyLen)
-	iv := mint.HkdfExpandLabel(cs.Hash, st.secret, "iv", []byte{}, cs.IvLen)
-
+	k := mint.HkdfExpandLabel(cs.Hash, secret, "key", []byte{}, cs.KeyLen)
+	iv := mint.HkdfExpandLabel(cs.Hash, secret, "iv", []byte{}, cs.IvLen)
+	pn := mint.HkdfExpandLabel(cs.Hash, secret, "pn", []byte{}, cs.KeyLen)
+	logf(logTypeAead, "key=%x iv=%x pn=%x", k, iv, pn)
 	st.aead, err = newWrappedAESGCM(k, iv)
 	if err != nil {
 		return nil, err
 	}
+	st.pne = newPneCipherFactoryAES(pn)
 
 	return &st, nil
 }
 
-func newCryptoStateFromSecret(secret []byte, label string, cs *mint.CipherSuiteParams) (*cryptoState, error) {
-	var err error
-
-	salt, err := hex.DecodeString(kQuicVersionSalt)
-	if err != nil {
-		panic("Bogus value")
-	}
-	extracted := mint.HkdfExtract(cs.Hash, salt, secret)
+func generateCleartextKeys(secret []byte, label string, cs *mint.CipherSuiteParams) (*cryptoState, error) {
+	logf(logTypeTls, "Cleartext keys: cid=%x initial_salt=%x", secret, kQuicVersionSalt)
+	extracted := mint.HkdfExtract(cs.Hash, kQuicVersionSalt, secret)
 	inner := mint.HkdfExpandLabel(cs.Hash, extracted, label, []byte{}, cs.Hash.Size())
+	logf(logTypeAead, "initial_secret (%s) = %x", label, inner)
 	return newCryptoStateInner(inner, cs)
 }
 
 func newCryptoStateFromTls(t *tlsConn, label string) (*cryptoState, error) {
-	var err error
-
-	secret, err := t.computeExporter(label)
-	if err != nil {
-		return nil, err
-	}
-
-	return newCryptoStateInner(secret, t.cs)
+	panic("TODO")
 }

@@ -12,7 +12,7 @@ type testTransportFactory struct {
 	transports map[string]*testTransport
 }
 
-func (f *testTransportFactory) makeTransport(remote *net.UDPAddr) (Transport, error) {
+func (f *testTransportFactory) MakeTransport(remote *net.UDPAddr) (Transport, error) {
 	return f.transports[remote.String()], nil
 }
 
@@ -55,10 +55,10 @@ func TestServer(t *testing.T) {
 	factory := &testTransportFactory{make(map[string]*testTransport)}
 	factory.addTransport(u, sTrans)
 
-	server := NewServer(factory, testTlsConfig, nil)
+	server := NewServer(factory, testTlsConfig(), nil)
 	assertNotNil(t, server, "Couldn't make server")
 
-	client := NewConnection(cTrans, RoleClient, testTlsConfig, nil, ah)
+	client := NewConnection(cTrans, RoleClient, testTlsConfig(), nil)
 	assertNotNil(t, client, "Couldn't make client")
 
 	n, err := client.CheckTimer()
@@ -80,7 +80,7 @@ func TestServer(t *testing.T) {
 	u2, _ := net.ResolveUDPAddr("udp", "127.0.0.1:4444") // Just a fixed address
 	cTrans2, sTrans2 := newTestTransportPair(true)
 	factory.addTransport(u2, sTrans2)
-	client = NewConnection(cTrans2, RoleClient, testTlsConfig, nil, ah)
+	client = NewConnection(cTrans2, RoleClient, testTlsConfig(), nil)
 	assertNotNil(t, client, "Couldn't make client")
 
 	n, err = client.CheckTimer()
@@ -104,25 +104,30 @@ func TestServerIdleTimeout(t *testing.T) {
 	factory := &testTransportFactory{make(map[string]*testTransport)}
 	factory.addTransport(u, sTrans)
 
-	server := NewServer(factory, testTlsConfig, nil)
+	server := NewServer(factory, testTlsConfig(), nil)
 	assertNotNil(t, server, "Couldn't make server")
 
-	client := NewConnection(cTrans, RoleClient, testTlsConfig, nil, ah)
+	client := NewConnection(cTrans, RoleClient, testTlsConfig(), nil)
 	assertNotNil(t, client, "Couldn't make client")
 
 	n, err := client.CheckTimer()
 	assertEquals(t, 1, n)
 	assertNotError(t, err, "Couldn't send client initial")
 
-	_, err = serverInputAll(t, sTrans, server, *u)
+	sconn, err := serverInputAll(t, sTrans, server, *u)
 	assertNotError(t, err, "Couldn't consume client initial")
+	assertNotNil(t, sconn, "no server connection")
 
 	assertEquals(t, 1, server.ConnectionCount())
 
-	// Now wait 15 seconds to make sure that the connection
-	// gets garbage collected.
-
-	time.Sleep(time.Second * 15)
+	// This pokes into internal state of the server to avoid having to include
+	// sleep calls in tests.  Don't do this at home kids.
+	// Wind the timer on the connection back to short-circuit the idle timeout.
+	sconn.lastInput = sconn.lastInput.Add(-1 - sconn.idleTimeout)
 	server.CheckTimer()
+	// A second nap to allow for draining period.
+	sconn.closingEnd = sconn.closingEnd.Add(-1 - time.Second)
+	server.CheckTimer()
+
 	assertEquals(t, 0, server.ConnectionCount())
 }

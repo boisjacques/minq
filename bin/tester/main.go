@@ -7,6 +7,8 @@ import (
 	"github.com/boisjacques/minq"
 	"io/ioutil"
 	"strings"
+
+	"github.com/ekr/minq"
 )
 
 var infile string
@@ -59,8 +61,8 @@ func main() {
 	}
 
 	strans := &stdoutTransport{}
-	conn := minq.NewConnection(strans, minq.RoleServer,
-		minq.NewTlsConfig(serverName), &connHandler{}, &minq.AddressHelper{})
+	config := minq.NewTlsConfig(serverName)
+	conn := minq.NewConnection(strans, minq.RoleServer, &config, nil)
 	err = conn.Input(in)
 	if err != nil {
 		fmt.Println("Couldn't process input: ", err)

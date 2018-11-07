@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/boisjacques/minq"
 	"github.com/cloudflare/cfssl/helpers"
+	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -30,6 +31,7 @@ var doHttp bool
 var statelessReset bool
 var cpuProfile string
 var echo bool
+var standalone bool
 var logToFile bool
 
 // Shared data structures.
@@ -46,7 +48,7 @@ func (c *conn) checkTimer() {
 	}
 }
 
-var conns = make(map[minq.ConnectionId]*conn)
+var conns = make(map[string]*conn)
 
 // An feed through server.
 type feedthroughServerHandler struct {
@@ -56,7 +58,7 @@ type feedthroughServerHandler struct {
 func (h *feedthroughServerHandler) NewConnection(c *minq.Connection) {
 	log.Println("New connection")
 	c.SetHandler(&feedthroughConnHandler{echo, 0})
-	conns[c.Id()] = &conn{c, time.Now()}
+	conns[c.ServerId().String()] = &conn{c, time.Now()}
 }
 
 type feedthroughConnHandler struct {
@@ -68,11 +70,14 @@ func (h *feedthroughConnHandler) StateChanged(s minq.State) {
 	log.Println("State changed to ", s)
 }
 
-func (h *feedthroughConnHandler) NewStream(s *minq.Stream) {
+func (h *feedthroughConnHandler) NewStream(s minq.Stream) {
+	log.Println("Created new stream id=", s.Id())
+}
+func (h *feedthroughConnHandler) NewRecvStream(s minq.RecvStream) {
 	log.Println("Created new stream id=", s.Id())
 }
 
-func (h *feedthroughConnHandler) StreamReadable(s *minq.Stream) {
+func (h *feedthroughConnHandler) StreamReadable(s minq.RecvStream) {
 	log.Println("Ready to read for stream id=", s.Id())
 	for {
 		b := make([]byte, 1024)
@@ -93,16 +98,17 @@ func (h *feedthroughConnHandler) StreamReadable(s *minq.Stream) {
 		b = b[:n]
 		h.bytesRead += n
 		os.Stdout.Write(b)
-		log.Println("Total bytes read = %d", h.bytesRead)
+		log.Printf("Total bytes read = %d\n", h.bytesRead)
 
 		if echo {
 			// Flip the case so we can distinguish echo
-			for i, _ := range b {
+			for i := range b {
 				if b[i] > 0x40 {
 					b[i] ^= 0x20
 				}
 			}
-			s.Write(b)
+			// This isn't really going to work but for now.
+			s.(minq.SendStream).Write(b)
 		}
 	}
 }
@@ -113,26 +119,30 @@ type httpServerHandler struct {
 
 func (h *httpServerHandler) NewConnection(c *minq.Connection) {
 	log.Println("New connection")
-	c.SetHandler(&httpConnHandler{make(map[uint32]*httpStream, 0)})
-	conns[c.Id()] = &conn{c, time.Now()}
+	c.SetHandler(&httpConnHandler{make(map[uint64]*httpStream, 0)})
+	conns[c.ServerId().String()] = &conn{c, time.Now()}
 }
 
 type httpStream struct {
-	s      *minq.Stream
+	s      minq.Stream
 	buf    []byte
 	closed bool
 }
 
 type httpConnHandler struct {
-	streams map[uint32]*httpStream
+	streams map[uint64]*httpStream
 }
 
 func (h *httpConnHandler) StateChanged(s minq.State) {
 	log.Println("State changed to ", s)
 }
 
-func (h *httpConnHandler) NewStream(s *minq.Stream) {
+func (h *httpConnHandler) NewStream(s minq.Stream) {
 	h.streams[s.Id()] = &httpStream{s, nil, false}
+}
+
+func (h *httpConnHandler) NewRecvStream(s minq.RecvStream) {
+	log.Println("For some reason some opened a unidirectional stream. Ignoring")
 }
 
 func (h *httpStream) Respond(val []byte) {
@@ -151,7 +161,7 @@ func (h *httpStream) Error(err string) {
 // Xs, up to 10,000
 // A non-number, in which case we respond with 10 repetitions
 // of that value.
-func (h *httpConnHandler) StreamReadable(s *minq.Stream) {
+func (h *httpConnHandler) StreamReadable(s minq.RecvStream) {
 	log.Println("Ready to read for stream id=", s.Id())
 	st := h.streams[s.Id()]
 	if st.closed {
@@ -231,6 +241,7 @@ func main() {
 	flag.BoolVar(&statelessReset, "stateless-reset", false, "Do stateless reset")
 	flag.BoolVar(&logToFile, "log-to-file", true, "Log to file")
 	flag.StringVar(&cpuProfile, "cpuprofile", "", "write cpu profile to file")
+	flag.BoolVar(&standalone, "standalone", false, "Run standalone")
 	flag.Parse()
 
 	var key crypto.Signer
@@ -343,41 +354,29 @@ func main() {
 	} else {
 		handler = &feedthroughServerHandler{echo}
 	}
-	server := minq.NewServer(minq.NewUdpTransportFactory(usock), config, handler)
+	server := minq.NewServer(minq.NewUdpTransportFactory(usock), &config, handler)
 
 	stdin := make(chan []byte)
-
-	/*
+	if !standalone {
 		go func() {
 			for {
 				b := make([]byte, 1024)
 				n, err := os.Stdin.Read(b)
 				if err == io.EOF {
-					fmt.Println("EOF received")
+					log.Println("EOF received")
 					close(stdin)
 					return
 				} else if err != nil {
-					fmt.Println("Error reading from stdin")
+					log.Println("Error reading from stdin")
 					return
 				}
 				b = b[:n]
 				stdin <- b
 			}
 		}()
-	*/
+	}
 
-	running := true
-	signalChan := make(chan os.Signal, 1)
-	sigChan := make(chan bool)
-	signal.Notify(signalChan, os.Interrupt)
-	go func() {
-		for _ = range signalChan {
-			fmt.Println("\nReceived an interrupt, stopping services...\n")
-			sigChan <- false
-		}
-	}()
-
-	for running {
+	for {
 
 		select {
 		case _, open := <-stdin:

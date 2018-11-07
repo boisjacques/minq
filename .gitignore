@@ -12,3 +12,5 @@ bin/client/client
 *.out
 
 bin/client/clnt
+
+*.test

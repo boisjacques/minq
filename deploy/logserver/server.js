@@ -21,14 +21,14 @@ app.get('/:connid', function(request, response) {
         return;
     }
 
-    if(connid.length != 16) {
-        response.status(400).send("Bogus connid (wrong length)");
+    if(connid.length < 4) {
+        response.status(400).send("Bogus connid (too short)");
         return;
     }
 
     connid = connid.toLowerCase();
     
-    var match = 'Conn: ' + connid + ":";
+    var match = 'Conn: ' + connid + "_";
     var data = "<pre>";
     const rl = readline.createInterface({
         input: fs.createReadStream(file),

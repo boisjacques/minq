@@ -5,10 +5,6 @@ import (
 	"crypto/cipher"
 )
 
-// Definition for AEAD using 64-bit FNV-1a
-type aeadFNV struct {
-}
-
 // aeadWrapper contains an existing AEAD object and does the
 // QUIC nonce masking.
 type aeadWrapper struct {
@@ -41,7 +37,7 @@ func (a *aeadWrapper) fmtNonce(in []byte) []byte {
 
 func (a *aeadWrapper) Seal(dst []byte, nonce []byte, plaintext []byte, aad []byte) []byte {
 	logf(logTypeAead, "AES protecting aad len=%d, plaintext len=%d", len(aad), len(plaintext))
-	logf(logTypeTrace, "AES input %x %x", aad, plaintext)
+	logf(logTypeTrace, "AES input AAD=%x P=%x", aad, plaintext)
 	ret := a.cipher.Seal(dst, a.fmtNonce(nonce), plaintext, aad)
 	logf(logTypeTrace, "AES output %x", ret)
 
@@ -50,7 +46,7 @@ func (a *aeadWrapper) Seal(dst []byte, nonce []byte, plaintext []byte, aad []byt
 
 func (a *aeadWrapper) Open(dst []byte, nonce []byte, ciphertext []byte, aad []byte) ([]byte, error) {
 	logf(logTypeAead, "AES unprotecting aad len=%d, ciphertext len=%d", len(aad), len(ciphertext))
-	logf(logTypeTrace, "AES input %x", ciphertext)
+	logf(logTypeTrace, "AES input AAD=%x C=%x", aad, ciphertext)
 	ret, err := a.cipher.Open(dst, a.fmtNonce(nonce), ciphertext, aad)
 	if err != nil {
 		return nil, err
